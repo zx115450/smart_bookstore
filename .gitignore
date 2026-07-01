@@ -32,5 +32,7 @@ build/
 ### VS Code ###
 .vscode/
 
+/docs/工厂模式实战博客.md
+
 ### Local secrets ###
 src/main/resources/application-local.yaml
