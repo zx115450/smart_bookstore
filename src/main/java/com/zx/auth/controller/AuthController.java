@@ -5,12 +5,14 @@ import com.zx.auth.dto.LoginRequest;
 import com.zx.auth.dto.LoginResponse;
 import com.zx.auth.dto.SendCodeRequest;
 import com.zx.auth.service.AuthService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -44,6 +46,7 @@ public class AuthController {
     @PostMapping(value = "login", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest req, HttpServletRequest servlet) {
         String ip = servlet.getRemoteAddr();
+        log.info("{}" , req.toString());
         try {
             var resp = authService.login(req, ip);
             if (resp == null) return ApiResponse.error(1001, "invalid credentials or code");

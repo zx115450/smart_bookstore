@@ -1,43 +1,43 @@
 package com.zx.auth.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "auth_verification_code")
+@TableName("auth_verification_code")
 public class AuthVerificationCode {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "login_type", nullable = false, length = 64)
+    @TableField("login_type")
     private String loginType;
 
-    @Column(nullable = false, length = 128)
+    @TableField("target")
     private String target;
 
-    @Column(nullable = false, length = 32)
+    @TableField("scene")
     private String scene;
 
-    @Column(name = "code_hash", nullable = false, length = 255)
+    @TableField("code_hash")
     private String codeHash;
 
-    @Column(name = "expires_at", nullable = false)
+    @TableField("expires_at")
     private LocalDateTime expiresAt;
 
-    @Column(name = "used_at")
+    @TableField("used_at")
     private LocalDateTime usedAt;
 
-    @Column(name = "send_ip", length = 45)
+    @TableField("send_ip")
     private String sendIp;
 
-    @Column(name = "created_at")
+    @TableField("created_at")
     private LocalDateTime createdAt;
 
-    @PrePersist
-    public void prePersist() { LocalDateTime now = LocalDateTime.now(); createdAt = now; }
-
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public String getLoginType() { return loginType; }
     public void setLoginType(String loginType) { this.loginType = loginType; }
     public String getTarget() { return target; }
@@ -52,5 +52,6 @@ public class AuthVerificationCode {
     public void setUsedAt(LocalDateTime usedAt) { this.usedAt = usedAt; }
     public String getSendIp() { return sendIp; }
     public void setSendIp(String sendIp) { this.sendIp = sendIp; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
-

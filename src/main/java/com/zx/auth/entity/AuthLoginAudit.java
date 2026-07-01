@@ -1,46 +1,53 @@
 package com.zx.auth.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "auth_login_audit")
+@TableName("auth_login_audit")
 public class AuthLoginAudit {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @TableField("user_id")
+    private Long userId;
+
+    @TableField(exist = false)
     private AuthUser user;
 
-    @Column(name = "login_type", nullable = false)
+    @TableField("login_type")
     private String loginType;
 
-    @Column
+    @TableField("target")
     private String target;
 
-    @Column(nullable = false)
+    @TableField("success")
     private Boolean success;
 
-    @Column(name = "fail_reason")
+    @TableField("fail_reason")
     private String failReason;
 
-    @Column(length = 45)
+    @TableField("ip")
     private String ip;
 
-    @Column(name = "user_agent")
+    @TableField("user_agent")
     private String userAgent;
 
-    @Column(name = "created_at")
+    @TableField("created_at")
     private LocalDateTime createdAt;
 
-    @PrePersist
-    public void prePersist() { createdAt = LocalDateTime.now(); }
-
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
     public AuthUser getUser() { return user; }
-    public void setUser(AuthUser user) { this.user = user; }
+    public void setUser(AuthUser user) {
+        this.user = user;
+        this.userId = user == null ? null : user.getId();
+    }
     public String getLoginType() { return loginType; }
     public void setLoginType(String loginType) { this.loginType = loginType; }
     public String getTarget() { return target; }
@@ -53,5 +60,6 @@ public class AuthLoginAudit {
     public void setIp(String ip) { this.ip = ip; }
     public String getUserAgent() { return userAgent; }
     public void setUserAgent(String userAgent) { this.userAgent = userAgent; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
-

@@ -1,57 +1,62 @@
 package com.zx.auth.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "auth_session")
+@TableName("auth_session")
 public class AuthSession {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @TableField("user_id")
+    private Long userId;
+
+    @TableField(exist = false)
     private AuthUser user;
 
-    @Column(name = "refresh_token_jti", nullable = false, length = 36)
+    @TableField("refresh_token_jti")
     private String refreshTokenJti;
 
-    @Column(name = "refresh_token_hash", nullable = false, length = 255)
+    @TableField("refresh_token_hash")
     private String refreshTokenHash;
 
-    @Column(name = "access_expires_at", nullable = false)
+    @TableField("access_expires_at")
     private LocalDateTime accessExpiresAt;
 
-    @Column(name = "refresh_expires_at", nullable = false)
+    @TableField("refresh_expires_at")
     private LocalDateTime refreshExpiresAt;
 
-    @Column(name = "remember_me", nullable = false)
+    @TableField("remember_me")
     private Boolean rememberMe = false;
 
-    @Column(name = "device_info")
+    @TableField("device_info")
     private String deviceInfo;
 
-    @Column(name = "login_ip", length = 45)
+    @TableField("login_ip")
     private String loginIp;
 
-    @Column(name = "revoked_at")
+    @TableField("revoked_at")
     private LocalDateTime revokedAt;
 
-    @Column(name = "created_at")
+    @TableField("created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @TableField("updated_at")
     private LocalDateTime updatedAt;
 
-    @PrePersist
-    public void prePersist() { LocalDateTime now = LocalDateTime.now(); createdAt = now; updatedAt = now; }
-    @PreUpdate
-    public void preUpdate() { updatedAt = LocalDateTime.now(); }
-
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
     public AuthUser getUser() { return user; }
-    public void setUser(AuthUser user) { this.user = user; }
+    public void setUser(AuthUser user) {
+        this.user = user;
+        this.userId = user == null ? null : user.getId();
+    }
     public String getRefreshTokenJti() { return refreshTokenJti; }
     public void setRefreshTokenJti(String refreshTokenJti) { this.refreshTokenJti = refreshTokenJti; }
     public String getRefreshTokenHash() { return refreshTokenHash; }
@@ -68,5 +73,8 @@ public class AuthSession {
     public void setLoginIp(String loginIp) { this.loginIp = loginIp; }
     public LocalDateTime getRevokedAt() { return revokedAt; }
     public void setRevokedAt(LocalDateTime revokedAt) { this.revokedAt = revokedAt; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
-

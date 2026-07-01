@@ -1,0 +1,11 @@
+# 本地敏感配置模板
+# 使用方法：复制本文件为 application-local.yaml，再填入真实账号密码
+
+spring:
+  mail:
+    username: your-email@qq.com
+    password: your-smtp-authorization-code
+  datasource:
+    url: jdbc:mysql://localhost:3306/test_demo?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&allowMultiQueries=true&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048
+    username: root
+    password: your-db-password

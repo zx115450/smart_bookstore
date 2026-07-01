@@ -1,41 +1,34 @@
 package com.zx.auth.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "auth_user")
+@TableName("auth_user")
 public class AuthUser {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 64)
+    @TableField("username")
     private String username;
 
-    @Column(name = "password_hash")
+    @TableField("password_hash")
     private String passwordHash;
 
-    @Column(nullable = false)
+    @TableField("status")
     private Integer status = 1;
 
-    @Column(name = "last_login_at")
+    @TableField("last_login_at")
     private LocalDateTime lastLoginAt;
 
-    @Column(name = "created_at")
+    @TableField("created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @TableField("updated_at")
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    public void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
-        createdAt = now; updatedAt = now;
-    }
-
-    @PreUpdate
-    public void preUpdate() { updatedAt = LocalDateTime.now(); }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -48,6 +41,7 @@ public class AuthUser {
     public LocalDateTime getLastLoginAt() { return lastLoginAt; }
     public void setLastLoginAt(LocalDateTime lastLoginAt) { this.lastLoginAt = lastLoginAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
-

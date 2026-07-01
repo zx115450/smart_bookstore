@@ -1,8 +1,26 @@
 package com.zx.auth.repository;
 
 import com.zx.auth.entity.AuthLoginAudit;
-import org.springframework.data.jpa.repository.JpaRepository;
+import com.zx.auth.mapper.AuthLoginAuditMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Repository;
 
-public interface AuthLoginAuditRepository extends JpaRepository<AuthLoginAudit, Long> {
+import java.time.LocalDateTime;
+
+@Repository
+@RequiredArgsConstructor
+public class AuthLoginAuditRepository {
+    private final AuthLoginAuditMapper mapper;
+
+    public AuthLoginAudit save(AuthLoginAudit audit) {
+        if (audit.getId() == null && audit.getCreatedAt() == null) {
+            audit.setCreatedAt(LocalDateTime.now());
+        }
+        if (audit.getId() == null) {
+            mapper.insert(audit);
+            return audit;
+        }
+        mapper.updateById(audit);
+        return audit;
+    }
 }
-

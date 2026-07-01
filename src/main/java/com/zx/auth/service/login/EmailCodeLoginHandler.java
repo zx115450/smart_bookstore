@@ -39,7 +39,7 @@ public class EmailCodeLoginHandler implements LoginHandler {
         codeRepo.save(c);
         // find user by identity (email)
         Optional<AuthUserIdentity> ident = identityRepo.findByIdentityTypeAndIdentityValue("email", req.getTarget());
-        AuthUser user;
+        AuthUser user = null;
         if (ident.isPresent()) {
             user = ident.get().getUser();
         } else {
