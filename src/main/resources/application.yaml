@@ -1,8 +1,6 @@
 spring:
   application:
     name: Factory_Test_Demo
-  config:
-    import: optional:classpath:application-local.yaml
   sql:
     init:
       mode: always
@@ -11,6 +9,8 @@ spring:
   mail:
     host: smtp.qq.com
     port: 465
+    username: 3498387581@qq.com
+    password: xsxcpvehijsadbdf
     protocol: smtp
     ssl:
       enabled: true
@@ -26,6 +26,9 @@ spring:
           timeout: 5000
           writetimeout: 5000
   datasource:
+    url: jdbc:mysql://localhost:3306/test_demo?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&allowMultiQueries=true&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048
+    username: root
+    password: 1234
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       pool-name: FactoryTestDemoHikariCP
@@ -36,23 +39,26 @@ spring:
       connection-timeout: 30000
       validation-timeout: 5000
       keepalive-time: 300000
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
   output:
     ansi:
       enabled: always
-
-mybatis-plus:
-  configuration:
-    map-underscore-to-camel-case: true
-    cache-enabled: false
-
 server:
   port: 8081
 
 logging:
   level:
     com:
-      zx:
-        auth:
-          mapper: debug
-          service: info
-          controller: info
+      sky:
+        mapper: debug
+        service: info
+        controller: info
