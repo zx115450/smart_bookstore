@@ -30,6 +30,9 @@ public class AuthSession {
     @TableField("refresh_expires_at")
     private LocalDateTime refreshExpiresAt;
 
+    @TableField("absolute_expires_at")
+    private LocalDateTime absoluteExpiresAt;
+
     @TableField("remember_me")
     private Boolean rememberMe = false;
 
@@ -65,6 +68,8 @@ public class AuthSession {
     public void setAccessExpiresAt(LocalDateTime accessExpiresAt) { this.accessExpiresAt = accessExpiresAt; }
     public LocalDateTime getRefreshExpiresAt() { return refreshExpiresAt; }
     public void setRefreshExpiresAt(LocalDateTime refreshExpiresAt) { this.refreshExpiresAt = refreshExpiresAt; }
+    public LocalDateTime getAbsoluteExpiresAt() { return absoluteExpiresAt; }
+    public void setAbsoluteExpiresAt(LocalDateTime absoluteExpiresAt) { this.absoluteExpiresAt = absoluteExpiresAt; }
     public Boolean getRememberMe() { return rememberMe; }
     public void setRememberMe(Boolean rememberMe) { this.rememberMe = rememberMe; }
     public String getDeviceInfo() { return deviceInfo; }

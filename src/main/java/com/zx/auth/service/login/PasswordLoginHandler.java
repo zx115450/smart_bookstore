@@ -3,8 +3,8 @@ package com.zx.auth.service.login;
 import com.zx.auth.dto.LoginRequest;
 import com.zx.auth.entity.AuthUser;
 import com.zx.auth.repository.AuthUserRepository;
-import com.zx.auth.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -13,6 +13,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class PasswordLoginHandler implements LoginHandler {
     private final AuthUserRepository userRepo;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public boolean supports(String loginType) {
@@ -26,8 +27,7 @@ public class PasswordLoginHandler implements LoginHandler {
         if (uo.isEmpty()) return null;
         AuthUser u = uo.get();
         if (u.getPasswordHash() == null) return null;
-        if (!u.getPasswordHash().equals(AuthService.sha256Hex(req.getPassword()))) return null;
+        if (!passwordEncoder.matches(req.getPassword(), u.getPasswordHash())) return null;
         return u;
     }
 }
-

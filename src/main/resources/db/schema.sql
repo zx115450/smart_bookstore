@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS auth_session (
   refresh_token_hash VARCHAR(255) NOT NULL COMMENT '建议存哈希',
   access_expires_at DATETIME NOT NULL,
   refresh_expires_at DATETIME NOT NULL,
+  absolute_expires_at DATETIME NOT NULL COMMENT '会话绝对过期（首次登录起算，refresh 不延长）',
   remember_me       TINYINT NOT NULL DEFAULT 0,
   device_info       VARCHAR(255) NULL,
   login_ip          VARCHAR(45) NULL,
@@ -95,16 +96,48 @@ CREATE TABLE IF NOT EXISTS auth_login_audit (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='登录行为审计';
 
 -- --------------------------------------------------
--- 可选：插入一个示例管理员账号（请替换 password_hash 为真实哈希）
--- password_hash 示例为 bcrypt/argon2 等算法的输出，不要存明文密码
+-- 6) RBAC 角色表
 -- --------------------------------------------------
+CREATE TABLE IF NOT EXISTS auth_role (
+  id                BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  code              VARCHAR(32) NOT NULL COMMENT '角色编码，如 USER',
+  name              VARCHAR(64) NOT NULL COMMENT '角色名称',
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_auth_role_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色';
+
+CREATE TABLE IF NOT EXISTS auth_user_role (
+  user_id           BIGINT UNSIGNED NOT NULL,
+  role_id           BIGINT UNSIGNED NOT NULL,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, role_id),
+  CONSTRAINT fk_user_role_user FOREIGN KEY (user_id) REFERENCES auth_user(id),
+  CONSTRAINT fk_user_role_role FOREIGN KEY (role_id) REFERENCES auth_role(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户角色关联';
+
+-- --------------------------------------------------
+-- 初始化角色与示例账号（密码 123456 的 BCrypt 哈希）
+-- --------------------------------------------------
+INSERT INTO auth_role (code, name)
+SELECT 'USER', '普通用户'
+WHERE NOT EXISTS (SELECT 1 FROM auth_role WHERE code = 'USER');
+
 INSERT INTO auth_user (username, password_hash, status)
-SELECT 'admin', '<REPLACE_WITH_BCRYPT_HASH>', 1
+SELECT 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 1
 WHERE NOT EXISTS (SELECT 1 FROM auth_user WHERE username = 'admin');
 
--- 若需绑定 email/phone，请在 auth_user_identity 中插入
--- INSERT INTO auth_user_identity (user_id, identity_type, identity_value, verified, is_primary)
--- VALUES (1, 'email', 'admin@example.com', 1, 1);
+INSERT INTO auth_user_role (user_id, role_id)
+SELECT u.id, r.id
+FROM auth_user u, auth_role r
+WHERE u.username = 'admin' AND r.code = 'USER'
+  AND NOT EXISTS (
+    SELECT 1 FROM auth_user_role ur WHERE ur.user_id = u.id AND ur.role_id = r.id
+  );
 
 -- 使用说明：将本文件放在资源目录并在 DB 管理工具中执行，或由 CI/CD 在初始化阶段运行。
+--
+-- 已有库升级（新增 absolute_expires_at）：
+ALTER TABLE auth_session ADD COLUMN absolute_expires_at DATETIME NULL COMMENT '会话绝对过期' AFTER refresh_expires_at;
+UPDATE auth_session SET absolute_expires_at = DATE_ADD(created_at, INTERVAL 90 DAY) WHERE absolute_expires_at IS NULL;
+ALTER TABLE auth_session MODIFY absolute_expires_at DATETIME NOT NULL;
 

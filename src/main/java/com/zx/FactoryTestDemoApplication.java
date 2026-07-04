@@ -1,13 +1,15 @@
 package com.zx;
 
+import com.zx.auth.config.AuthJwtProperties;
+import com.zx.auth.config.AuthRateLimitProperties;
 import lombok.extern.slf4j.Slf4j;
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @Slf4j
 @SpringBootApplication
-@MapperScan(value = "com.zx.auth.mapper", sqlSessionTemplateRef = "sqlSessionTemplate")
+@EnableConfigurationProperties({AuthJwtProperties.class, AuthRateLimitProperties.class})
 public class FactoryTestDemoApplication {
 
     public static void main(String[] args) {

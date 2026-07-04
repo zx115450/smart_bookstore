@@ -8,6 +8,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class LoginHandlerFactory {
+
     private final List<LoginHandler> handlers;
 
     public LoginHandler getHandler(String loginType) {

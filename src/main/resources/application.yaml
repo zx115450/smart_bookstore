@@ -39,26 +39,49 @@ spring:
       connection-timeout: 30000
       validation-timeout: 5000
       keepalive-time: 300000
-  jpa:
-    database-platform: org.hibernate.dialect.MySQLDialect
-    hibernate:
-      ddl-auto: none
-    properties:
-      hibernate:
-        format_sql: true
-        jdbc:
-          time_zone: UTC
-    open-in-view: false
   output:
     ansi:
       enabled: always
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+
+# 持久层：MyBatis-Plus（不使用 JPA / Hibernate）
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
 server:
   port: 8081
+
+auth:
+  jwt:
+    secret: ${JWT_SECRET:FactoryTestDemoChangeMeInProductionUse256BitKey123456}
+    access-expire-seconds: 7200
+    refresh-expire-days: 7
+    refresh-expire-days-remember: 30
+    session-absolute-expire-days: 90
+    issuer: Factory_Test_Demo
+  rate-limit:
+    send-code-per-target-seconds: 60
+    send-code-per-target-hourly: 5
+    send-code-per-ip-hourly: 10
+    login-fail-max: 5
+    login-fail-lock-minutes: 15
+  verification-code-ttl-seconds: 300
+  session-cache:
+    enabled: true
 
 logging:
   level:
     com:
-      sky:
-        mapper: debug
-        service: info
-        controller: info
+      zx:
+        auth:
+          mapper: debug
+          service: info
+          controller: info

@@ -1,33 +1,41 @@
 package com.zx.auth.service;
 
+import com.zx.auth.config.AuthJwtProperties;
 import com.zx.auth.dto.LoginRequest;
 import com.zx.auth.dto.LoginResponse;
 import com.zx.auth.dto.SendCodeRequest;
-import com.zx.auth.entity.*;
+import com.zx.auth.entity.AuthLoginAudit;
+import com.zx.auth.entity.AuthSession;
+import com.zx.auth.entity.AuthUser;
 import com.zx.auth.repository.*;
+import com.zx.auth.service.login.LoginHandlerFactory;
+import com.zx.auth.service.sendcode.SendCodeHandlerFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import com.zx.auth.service.login.LoginHandlerFactory;
-import com.zx.auth.service.sendcode.SendCodeHandlerFactory;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final AuthUserRepository userRepo;
-    private final AuthUserIdentityRepository identityRepo;
-    private final AuthVerificationCodeRepository codeRepo;
     private final AuthSessionRepository sessionRepo;
     private final AuthLoginAuditRepository auditRepo;
+    private final AuthRoleRepository roleRepo;
     private final LoginHandlerFactory handlerFactory;
     private final SendCodeHandlerFactory sendCodeHandlerFactory;
+    private final JwtService jwtService;
+    private final AuthJwtProperties jwtProperties;
+    private final AuthRedisService authRedisService;
 
     public static String sha256Hex(String input) {
         try {
@@ -41,44 +49,41 @@ public class AuthService {
         }
     }
 
-    public Map<String,Object> sendCode(SendCodeRequest req, String clientIp) {
+    public Map<String, Object> sendCode(SendCodeRequest req, String clientIp) {
+        authRedisService.checkSendCodeRateLimit(req.getTarget(), clientIp);
         var handler = sendCodeHandlerFactory.getHandler(req.getLoginType());
         return handler.handle(req, clientIp);
     }
 
-    public LoginResponse login(LoginRequest req, String clientIp) {
+    public LoginResponse login(LoginRequest req, String clientIp, String userAgent) {
+        //  用 handle 校验 -> User
+        // user -> 创建session(refreshToken) , accessToken
+
         String type = req.getLoginType();
         if (type == null) throw new IllegalArgumentException("loginType required");
-        // Delegate to a login handler (factory + strategy)
+
+        String loginKey = resolveLoginKey(req);
+        //检查是否因为登录次数过多而禁止登录
+        authRedisService.checkLoginAllowed(loginKey);
+
         var handler = handlerFactory.getHandler(type);
         AuthUser user = handler.handle(req, clientIp);
-        if (user == null) return null;
-        return createSessionAndResponse(user, req.getRememberMe());
-    }
+        if (user == null) {
+            //登录失败 -> 验证码或者密码错误
+            authRedisService.recordLoginFailure(loginKey);
+            recordAudit(null, type, loginKey, false, "invalid credentials or code", clientIp, userAgent);
+            return null;
+        }
+        //确保这个登录登录对象有一个默认的Role
+        roleRepo.ensureDefaultUserRole(user.getId());
 
-    private LoginResponse createSessionAndResponse(AuthUser user, boolean rememberMe) {
-        String access = "access:" + UUID.randomUUID();
-        String jti = UUID.randomUUID().toString();
-        String refresh = jti + ":" + UUID.randomUUID();
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime accessExp = now.plusHours(2);
-        LocalDateTime refreshExp = now.plusDays(rememberMe?30:7);
+        authRedisService.clearLoginFailure(loginKey);
 
-        AuthSession s = new AuthSession();
-        s.setUser(user);
-        s.setRefreshTokenJti(jti);
-        s.setRefreshTokenHash(sha256Hex(refresh));
-        s.setAccessExpiresAt(accessExp);
-        s.setRefreshExpiresAt(refreshExp);
-        s.setRememberMe(rememberMe);
-        sessionRepo.save(s);
+        user.setLastLoginAt(LocalDateTime.now());
 
-        LoginResponse resp = new LoginResponse();
-        resp.setAccessToken(access);
-        resp.setRefreshToken(refresh);
-        resp.setExpireIn(7200);
-        resp.setUserInfo(new LoginResponse.UserInfo(user.getId(), user.getUsername()));
-        return resp;
+        userRepo.save(user);
+        recordAudit(user.getId(), type, loginKey, true, null, clientIp, userAgent);
+        return createSessionAndResponse(user, req.getRememberMe(), clientIp);
     }
 
     public LoginResponse refresh(String refreshToken) {
@@ -86,20 +91,112 @@ public class AuthService {
         String[] parts = refreshToken.split(":", 2);
         if (parts.length != 2) return null;
         String jti = parts[0];
+
         Optional<AuthSession> so = sessionRepo.findByRefreshTokenJti(jti);
         if (so.isEmpty()) return null;
         AuthSession s = so.get();
-        if (s.getRevokedAt() != null) return null;
+
+        if (s.getRevokedAt() != null) {
+            sessionRepo.revokeAllByUserId(s.getUserId());
+            return null;
+        }
+        if (s.getAbsoluteExpiresAt() != null && s.getAbsoluteExpiresAt().isBefore(LocalDateTime.now())) {
+            return null;
+        }
         if (s.getRefreshExpiresAt().isBefore(LocalDateTime.now())) return null;
         if (!s.getRefreshTokenHash().equals(sha256Hex(refreshToken))) return null;
-        String access = "access:" + UUID.randomUUID();
+
+        s.setRevokedAt(LocalDateTime.now());
+        sessionRepo.save(s);
+
+        List<String> roles = roleRepo.findRoleCodesByUserId(s.getUser().getId());
+
+        return createRotatedSession(s.getUser(), s.getRememberMe(), s.getLoginIp(), roles, s.getAbsoluteExpiresAt());
+    }
+
+    public void logout(String accessToken, String refreshToken) {
+        if (accessToken != null && accessToken.startsWith("Bearer ")) {
+            accessToken = accessToken.substring(7).trim();
+        }
+        if (accessToken != null && !accessToken.isBlank()) {
+            try {
+                JwtService.AccessTokenClaims claims = jwtService.parseAccessToken(accessToken);
+                long ttl = Duration.between(Instant.now(), jwtService.getExpirationInstant(accessToken)).getSeconds();
+                authRedisService.blacklistAccessToken(claims.jti(), ttl);
+                sessionRepo.revokeById(claims.sessionId());
+            } catch (JwtService.InvalidAccessTokenException | JwtService.TokenExpiredException ignored) {
+                // access 已过期时仍尝试撤销 refresh
+            }
+        }
+
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            String[] parts = refreshToken.split(":", 2);
+            if (parts.length == 2) {
+                sessionRepo.findByRefreshTokenJti(parts[0]).ifPresent(session -> sessionRepo.revokeById(session.getId()));
+            }
+        }
+    }
+
+    private LoginResponse createSessionAndResponse(AuthUser user, boolean rememberMe, String loginIp) {
+        roleRepo.ensureDefaultUserRole(user.getId());
+        List<String> roles = roleRepo.findRoleCodesByUserId(user.getId());
+        return createRotatedSession(user, rememberMe, loginIp, roles, null);
+    }
+
+    private LoginResponse createRotatedSession(AuthUser user, boolean rememberMe, String loginIp, List<String> roles,
+                                               LocalDateTime inheritedAbsoluteExpiresAt) {
+        String jti = UUID.randomUUID().toString();
+        String refresh = jti + ":" + UUID.randomUUID();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime accessExp = now.plusSeconds(jwtProperties.getAccessExpireSeconds());
+
+        LocalDateTime absoluteExp = inheritedAbsoluteExpiresAt != null
+                ? inheritedAbsoluteExpiresAt
+                : now.plusDays(jwtProperties.getSessionAbsoluteExpireDays());
+
+        LocalDateTime slidingRefreshExp = now.plusDays(
+                rememberMe ? jwtProperties.getRefreshExpireDaysRemember() : jwtProperties.getRefreshExpireDays()
+        );
+        LocalDateTime refreshExp = slidingRefreshExp.isAfter(absoluteExp) ? absoluteExp : slidingRefreshExp;
+
+        AuthSession s = new AuthSession();
+        s.setUser(user);
+        s.setRefreshTokenJti(jti);
+        s.setRefreshTokenHash(sha256Hex(refresh));
+        s.setAccessExpiresAt(accessExp);
+        s.setRefreshExpiresAt(refreshExp);
+        s.setAbsoluteExpiresAt(absoluteExp);
+        s.setRememberMe(rememberMe);
+        s.setLoginIp(loginIp);
+        sessionRepo.save(s);
+
+        String access = jwtService.createAccessToken(user.getId(), user.getUsername(), s.getId(), roles);
+
         LoginResponse resp = new LoginResponse();
         resp.setAccessToken(access);
-        resp.setRefreshToken(refreshToken);
-        resp.setExpireIn(7200);
-        resp.setUserInfo(new LoginResponse.UserInfo(s.getUser().getId(), s.getUser().getUsername()));
+        resp.setRefreshToken(refresh);
+        resp.setExpireIn(jwtProperties.getAccessExpireSeconds());
+        resp.setUserInfo(new LoginResponse.UserInfo(user.getId(), user.getUsername(), roles));
         return resp;
     }
+
+    private String resolveLoginKey(LoginRequest req) {
+        if ("password".equals(req.getLoginType())) {
+            return req.getAccount();
+        }
+        return req.getTarget();
+    }
+
+    private void recordAudit(Long userId, String loginType, String target, boolean success,
+                             String failReason, String ip, String userAgent) {
+        AuthLoginAudit audit = new AuthLoginAudit();
+        audit.setUserId(userId);
+        audit.setLoginType(loginType);
+        audit.setTarget(target);
+        audit.setSuccess(success);
+        audit.setFailReason(failReason);
+        audit.setIp(ip);
+        audit.setUserAgent(userAgent);
+        auditRepo.save(audit);
+    }
 }
-
-
