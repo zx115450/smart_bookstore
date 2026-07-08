@@ -82,7 +82,9 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
 
         userRepo.save(user);
-        recordAudit(user.getId(), type, loginKey, true, null, clientIp, userAgent);
+
+        String auditTarget = req.getTarget() != null ? req.getTarget() : loginKey;
+        recordAudit(user.getId(), type, auditTarget, true, null, clientIp, userAgent);
         return createSessionAndResponse(user, req.getRememberMe(), clientIp);
     }
 
@@ -176,13 +178,21 @@ public class AuthService {
         resp.setAccessToken(access);
         resp.setRefreshToken(refresh);
         resp.setExpireIn(jwtProperties.getAccessExpireSeconds());
-        resp.setUserInfo(new LoginResponse.UserInfo(user.getId(), user.getUsername(), roles));
+        resp.setUserInfo(new LoginResponse.UserInfo(
+                user.getId(),
+                user.getUsername(),
+                roles,
+                user.getBalance() != null ? user.getBalance() : java.math.BigDecimal.ZERO
+        ));
         return resp;
     }
 
     private String resolveLoginKey(LoginRequest req) {
         if ("password".equals(req.getLoginType())) {
             return req.getAccount();
+        }
+        if ("qq_oauth".equals(req.getLoginType())) {
+            return req.getState();
         }
         return req.getTarget();
     }

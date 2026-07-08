@@ -32,7 +32,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/login",
             "/api/auth/refresh",
             "/api/auth/code/send",
-            "/api/auth/logout"
+            "/api/auth/logout",
+            "/api/auth/oauth/qq/state",
+            "/api/auth/oauth/qq/callback"
     );
 
     private final JwtService jwtService;
@@ -68,12 +70,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             JwtService.AccessTokenClaims claims = jwtService.parseAccessToken(token);
-
+            //Redis通过jti记录黑名单
             if (authRedisService.isAccessBlacklisted(claims.jti())) {
                 writeUnauthorized(response, 2006, "token revoked");
                 return;
             }
-
+            //redis通过记录Session校验RefreshToken的合法性
             var sessionOpt = sessionRepository.findById(claims.sessionId());
             if (sessionOpt.isEmpty() || sessionOpt.get().getRevokedAt() != null) {
                 writeUnauthorized(response, 2004, "session revoked or not found");

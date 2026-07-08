@@ -22,6 +22,7 @@ public class AuthRedisService {
     private static final String PREFIX_LIMIT_SEND_IP_HOUR = "auth:limit:send:ip:";
     private static final String PREFIX_LIMIT_LOGIN_FAIL = "auth:limit:login:fail:";
     private static final String PREFIX_BLACKLIST_ACCESS = "auth:blacklist:access:";
+    private static final String PREFIX_OAUTH_STATE = "auth:oauth:state:";
 
     private final StringRedisTemplate redis;
     private final AuthRateLimitProperties rateLimitProperties;
@@ -130,6 +131,32 @@ public class AuthRedisService {
             return false;
         }
         return Boolean.TRUE.equals(redis.hasKey(PREFIX_BLACKLIST_ACCESS + jti));
+    }
+
+    /** 保存 OAuth state，callback 校验通过后一次性消费。 */
+    public void saveOAuthState(String state, long ttlSeconds) {
+        if (state == null || state.isBlank()) {
+            throw new IllegalArgumentException("state required");
+        }
+        redis.opsForValue().set(PREFIX_OAUTH_STATE + state, "1", Duration.ofSeconds(ttlSeconds));
+    }
+
+    /** 判断 OAuth state 是否存在且未过期。 */
+    public boolean hasOAuthState(String state) {
+        if (state == null || state.isBlank()) {
+            return false;
+        }
+        return Boolean.TRUE.equals(redis.hasKey(PREFIX_OAUTH_STATE + state));
+    }
+
+    /** 校验并删除 OAuth state，防止 CSRF 与重放。 */
+    public boolean consumeOAuthState(String state) {
+        if (state == null || state.isBlank()) {
+            return false;
+        }
+        String key = PREFIX_OAUTH_STATE + state;
+        Boolean deleted = redis.delete(key);
+        return Boolean.TRUE.equals(deleted);
     }
 
     /** 滑动窗口计数：窗口内次数不超过 maxCount 则允许，首次计数时设置过期时间。 */

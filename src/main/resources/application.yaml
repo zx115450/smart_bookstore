@@ -76,6 +76,26 @@ auth:
   verification-code-ttl-seconds: 300
   session-cache:
     enabled: true
+  oauth:
+    qq:
+      app-id: ${QQ_APP_ID:}
+      app-key: ${QQ_APP_KEY:}
+      redirect-uri: ${QQ_REDIRECT_URI:http://localhost:8081/api/auth/oauth/qq/callback}
+      frontend-success-url: ${QQ_FRONTEND_SUCCESS_URL:http://localhost:5173/oauth/qq/success}
+      frontend-error-url: ${QQ_FRONTEND_ERROR_URL:http://localhost:5173/oauth/qq/error}
+      state-ttl-seconds: 600
+
+bookstore:
+  cache:
+    enabled: true
+    detail-ttl-seconds: 1800
+    detail-ttl-jitter-seconds: 300
+
+checkin:
+  frontend-base-url: ${CHECKIN_FRONTEND_URL:http://localhost:5173}
+  streak-reward-days: 7
+  window-minutes-before: 15
+  window-minutes-after: 15
 
 logging:
   level:
@@ -85,3 +105,5 @@ logging:
           mapper: debug
           service: info
           controller: info
+        bookstore:
+          service: info

@@ -1,7 +1,7 @@
 package com.zx.auth.dto;
 
 public class LoginRequest {
-    private String loginType; // qq_email_code, phone_code, password
+    private String loginType; // qq_email_code, phone_code, password, qq_oauth
     private Boolean rememberMe;
 
     // password login
@@ -9,8 +9,11 @@ public class LoginRequest {
     private String password;
 
     // code login
-    private String target; // email or phone
+    private String target; // email or phone; qq_oauth 成功后由 handler 写入 openid
     private String code;
+
+    // qq oauth login
+    private String state;
 
     public String getLoginType() { return loginType; }
     public void setLoginType(String loginType) { this.loginType = loginType; }
@@ -24,5 +27,7 @@ public class LoginRequest {
     public void setTarget(String target) { this.target = target; }
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }
+    public String getState() { return state; }
+    public void setState(String state) { this.state = state; }
 }
 

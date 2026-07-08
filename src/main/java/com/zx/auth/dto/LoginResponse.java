@@ -1,5 +1,6 @@
 package com.zx.auth.dto;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public class LoginResponse {
@@ -12,6 +13,7 @@ public class LoginResponse {
         private Long id;
         private String username;
         private List<String> roles;
+        private BigDecimal balance;
 
         public UserInfo() {
         }
@@ -27,12 +29,21 @@ public class LoginResponse {
             this.roles = roles;
         }
 
+        public UserInfo(Long id, String username, List<String> roles, BigDecimal balance) {
+            this.id = id;
+            this.username = username;
+            this.roles = roles;
+            this.balance = balance;
+        }
+
         public Long getId() { return id; }
         public String getUsername() { return username; }
         public List<String> getRoles() { return roles; }
+        public BigDecimal getBalance() { return balance; }
         public void setId(Long id) { this.id = id; }
         public void setUsername(String username) { this.username = username; }
         public void setRoles(List<String> roles) { this.roles = roles; }
+        public void setBalance(BigDecimal balance) { this.balance = balance; }
     }
 
     public String getAccessToken() { return accessToken; }

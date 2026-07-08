@@ -87,7 +87,12 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public record AccessTokenClaims(Long userId, String username, Long sessionId, String jti, List<String> roles) {
+    public record AccessTokenClaims(
+            Long userId,
+            String username,
+            Long sessionId,
+            String jti,
+            List<String> roles) {
     }
 
     public static class TokenExpiredException extends RuntimeException {

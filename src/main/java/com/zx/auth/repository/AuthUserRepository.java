@@ -6,6 +6,7 @@ import com.zx.auth.mapper.AuthUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -28,6 +29,20 @@ public class AuthUserRepository {
             return Optional.empty();
         }
         return Optional.ofNullable(mapper.selectById(id));
+    }
+
+    public Optional<AuthUser> findByIdForUpdate(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(mapper.selectByIdForUpdate(id));
+    }
+
+    public boolean deductBalance(Long userId, BigDecimal amount) {
+        if (userId == null || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        return mapper.deductBalance(userId, amount) > 0;
     }
 
     public AuthUser save(AuthUser user) {

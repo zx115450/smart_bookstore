@@ -1,0 +1,119 @@
+package com.zx.bookstore.borrow.repository;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zx.bookstore.borrow.entity.BorrowOrder;
+import com.zx.bookstore.borrow.enums.BorrowOrderStatus;
+import com.zx.bookstore.borrow.mapper.BorrowOrderMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+@RequiredArgsConstructor
+public class BorrowOrderRepository {
+
+    private final BorrowOrderMapper mapper;
+
+    public Optional<BorrowOrder> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(mapper.selectById(id));
+    }
+
+    public long countOccupiedByBookId(Long bookId) {
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getBookId, bookId)
+                        .in(BorrowOrder::getStatus,
+                                BorrowOrderStatus.APPLIED.name(),
+                                BorrowOrderStatus.BORROWED.name(),
+                                BorrowOrderStatus.OVERDUE.name())
+        );
+        return count == null ? 0 : count;
+    }
+
+    public boolean hasActiveBorrowByUser(Long userId) {
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getUserId, userId)
+                        .in(BorrowOrder::getStatus,
+                                BorrowOrderStatus.BORROWED.name(),
+                                BorrowOrderStatus.OVERDUE.name())
+        );
+        return count != null && count > 0;
+    }
+
+    public List<BorrowOrder> pageByUser(Long userId, String status, long page, long size) {
+        long safePage = Math.max(1, page);
+        long safeSize = Math.min(Math.max(1, size), 100);
+        long offset = (safePage - 1) * safeSize;
+        var wrapper = Wrappers.<BorrowOrder>lambdaQuery()
+                .eq(BorrowOrder::getUserId, userId)
+                .orderByDesc(BorrowOrder::getId);
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(BorrowOrder::getStatus, status);
+        }
+        return mapper.selectList(wrapper.last("LIMIT " + safeSize + " OFFSET " + offset));
+    }
+
+    public long countByUser(Long userId, String status) {
+        var wrapper = Wrappers.<BorrowOrder>lambdaQuery().eq(BorrowOrder::getUserId, userId);
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(BorrowOrder::getStatus, status);
+        }
+        Long count = mapper.selectCount(wrapper);
+        return count == null ? 0 : count;
+    }
+
+    public List<BorrowOrder> pageAll(String status, long page, long size) {
+        long safePage = Math.max(1, page);
+        long safeSize = Math.min(Math.max(1, size), 100);
+        long offset = (safePage - 1) * safeSize;
+        var wrapper = Wrappers.<BorrowOrder>lambdaQuery()
+                .orderByDesc(BorrowOrder::getId);
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(BorrowOrder::getStatus, status);
+        }
+        return mapper.selectList(wrapper.last("LIMIT " + safeSize + " OFFSET " + offset));
+    }
+
+    public long countAll(String status) {
+        var wrapper = Wrappers.<BorrowOrder>lambdaQuery();
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(BorrowOrder::getStatus, status);
+        }
+        Long count = mapper.selectCount(wrapper);
+        return count == null ? 0 : count;
+    }
+
+    public BorrowOrder save(BorrowOrder order) {
+        LocalDateTime now = LocalDateTime.now();
+        if (order.getId() == null) {
+            if (order.getCreatedAt() == null) {
+                order.setCreatedAt(now);
+            }
+            order.setUpdatedAt(now);
+            mapper.insert(order);
+            return order;
+        }
+        order.setUpdatedAt(now);
+        mapper.updateById(order);
+        return order;
+    }
+
+    public int updateToBorrowed(Long id, LocalDateTime borrowAt, LocalDateTime dueAt) {
+        return mapper.updateToBorrowed(id, borrowAt, dueAt);
+    }
+
+    public int updateToCancelled(Long id) {
+        return mapper.updateToCancelled(id);
+    }
+
+    public int updateToReturned(Long id, LocalDateTime returnAt) {
+        return mapper.updateToReturned(id, returnAt);
+    }
+}

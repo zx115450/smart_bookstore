@@ -13,7 +13,15 @@ import javax.sql.DataSource;
  * MyBatis-Plus 配置（项目持久层统一使用 MyBatis-Plus，不使用 JPA）。
  */
 @Configuration
-@MapperScan(value = "com.zx.auth.mapper", sqlSessionTemplateRef = "sqlSessionTemplate")
+@MapperScan(value = {
+        "com.zx.auth.mapper",
+        "com.zx.reservation.mapper",
+        "com.zx.bookstore.catalog.mapper",
+        "com.zx.bookstore.borrow.mapper",
+        "com.zx.bookstore.coupon.mapper",
+        "com.zx.bookstore.trade.mapper",
+        "com.zx.marketing.checkin.mapper"
+}, sqlSessionTemplateRef = "sqlSessionTemplate")
 public class MybatisPlusConfig {
 
     @Bean

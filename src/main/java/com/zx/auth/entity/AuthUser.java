@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @TableName("auth_user")
@@ -17,6 +18,9 @@ public class AuthUser {
 
     @TableField("password_hash")
     private String passwordHash;
+
+    @TableField("balance")
+    private BigDecimal balance = BigDecimal.valueOf(100);
 
     @TableField("status")
     private Integer status = 1;
@@ -36,6 +40,8 @@ public class AuthUser {
     public void setUsername(String username) { this.username = username; }
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public BigDecimal getBalance() { return balance; }
+    public void setBalance(BigDecimal balance) { this.balance = balance; }
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }
     public LocalDateTime getLastLoginAt() { return lastLoginAt; }
