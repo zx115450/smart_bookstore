@@ -11,4 +11,9 @@ public class CouponExceptionHandler {
     public ApiResponse<Void> handleCouponException(CouponException ex) {
         return ApiResponse.error(ex.getCode(), ex.getMessage());
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ApiResponse<Void> handleIllegalArgument(IllegalArgumentException ex) {
+        return ApiResponse.error(1002, ex.getMessage());
+    }
 }

@@ -1,6 +1,8 @@
 package com.zx.bookstore.borrow.controller;
 
 import com.zx.auth.dto.ApiResponse;
+import com.zx.auth.security.AuthAttributes;
+import com.zx.auth.security.AuthPrincipal;
 import com.zx.bookstore.borrow.dto.BorrowOrderResponse;
 import com.zx.bookstore.borrow.service.BorrowService;
 import com.zx.bookstore.catalog.dto.PageResult;
@@ -27,8 +29,11 @@ public class BorrowAdminController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/orders/{id}/confirm")
-    public ApiResponse<BorrowOrderResponse> confirm(@PathVariable Long id) {
-        return ApiResponse.ok(borrowService.confirm(id));
+    public ApiResponse<BorrowOrderResponse> confirm(
+            @RequestAttribute(AuthAttributes.AUTH_USER) AuthPrincipal principal,
+            @PathVariable Long id
+    ) {
+        return ApiResponse.ok(borrowService.confirm(id, principal.userId()));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -39,7 +44,10 @@ public class BorrowAdminController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/orders/{id}/return")
-    public ApiResponse<BorrowOrderResponse> returnBook(@PathVariable Long id) {
-        return ApiResponse.ok(borrowService.adminReturn(id));
+    public ApiResponse<BorrowOrderResponse> returnBook(
+            @RequestAttribute(AuthAttributes.AUTH_USER) AuthPrincipal principal,
+            @PathVariable Long id
+    ) {
+        return ApiResponse.ok(borrowService.adminReturn(id, principal.userId()));
     }
 }

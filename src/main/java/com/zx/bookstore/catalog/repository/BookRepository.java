@@ -116,4 +116,11 @@ public class BookRepository {
         }
         return mapper.deductSaleStock(bookId, quantity) > 0;
     }
+
+    /** 供布隆过滤器启动预热：扫描 book 表全部 id（含下架书，经典布隆不可删）。 */
+    public List<Long> listAllIds() {
+        return mapper.selectList(
+                Wrappers.<Book>lambdaQuery().select(Book::getId)
+        ).stream().map(Book::getId).toList();
+    }
 }

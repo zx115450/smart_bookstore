@@ -93,4 +93,29 @@ public class TradeOrderRepository {
     public boolean markCancelled(Long orderId, Long userId) {
         return orderMapper.markCancelled(orderId, userId) > 0;
     }
+
+    public boolean markCancelledByTimeout(Long orderId) {
+        return orderMapper.markCancelledByTimeout(orderId) > 0;
+    }
+
+    public List<TradeOrder> pageAll(String status, long page, long size) {
+        long safePage = Math.max(1, page);
+        long safeSize = Math.min(Math.max(1, size), 100);
+        long offset = (safePage - 1) * safeSize;
+        var wrapper = Wrappers.<TradeOrder>lambdaQuery()
+                .orderByDesc(TradeOrder::getId);
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(TradeOrder::getStatus, status);
+        }
+        return orderMapper.selectList(wrapper.last("LIMIT " + safeSize + " OFFSET " + offset));
+    }
+
+    public long countAll(String status) {
+        var wrapper = Wrappers.<TradeOrder>lambdaQuery();
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(TradeOrder::getStatus, status);
+        }
+        Long count = orderMapper.selectCount(wrapper);
+        return count == null ? 0 : count;
+    }
 }

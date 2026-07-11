@@ -7,6 +7,8 @@ public class TradeOrderResponse {
 
     private Long id;
     private String orderNo;
+    private Long userId;
+    private String username;
     private BigDecimal totalAmount;
     private BigDecimal discountAmount;
     private BigDecimal payAmount;
@@ -19,6 +21,10 @@ public class TradeOrderResponse {
     public void setId(Long id) { this.id = id; }
     public String getOrderNo() { return orderNo; }
     public void setOrderNo(String orderNo) { this.orderNo = orderNo; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public BigDecimal getDiscountAmount() { return discountAmount; }

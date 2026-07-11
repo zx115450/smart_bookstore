@@ -33,4 +33,19 @@ public interface BorrowOrderMapper extends BaseMapper<BorrowOrder> {
             WHERE id = #{id} AND status IN ('BORROWED', 'OVERDUE')
             """)
     int updateToReturned(@Param("id") Long id, @Param("returnAt") LocalDateTime returnAt);
+
+    @Update("""
+            UPDATE borrow_order
+            SET status = 'OVERDUE', updated_at = NOW()
+            WHERE id = #{id} AND status = 'BORROWED'
+            """)
+    int updateToOverdue(@Param("id") Long id);
+
+    @Update("""
+            UPDATE borrow_order
+            SET status = 'OVERDUE', updated_at = NOW()
+            WHERE status = 'BORROWED' AND due_at < NOW()
+            LIMIT #{limit}
+            """)
+    int updateOverdueBatch(@Param("limit") int limit);
 }

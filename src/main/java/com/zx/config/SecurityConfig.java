@@ -38,6 +38,8 @@ public class SecurityConfig {
                                 "/api/auth/oauth/qq/state",
                                 "/api/auth/oauth/qq/callback"
                         ).permitAll()
+                        .requestMatchers("/api/admin/**", "/api/reservation/admin/**")
+                        .hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

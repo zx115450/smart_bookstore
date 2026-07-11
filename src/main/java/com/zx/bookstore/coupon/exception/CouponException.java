@@ -28,4 +28,8 @@ public class CouponException extends RuntimeException {
     public static CouponException templateNotFound() {
         return new CouponException(4104, "优惠券模板不存在");
     }
+
+    public static CouponException unsupportedCouponType() {
+        return new CouponException(4106, "不支持的优惠券类型");
+    }
 }

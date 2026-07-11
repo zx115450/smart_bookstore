@@ -1,15 +1,17 @@
 package com.zx.bookstore.trade.dto;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 public class CreateTradeOrderRequest {
 
+    private List<Long> cartItemIds;
     private Long bookId;
     private Integer quantity;
     private Long userCouponId;
     private String idempotencyKey;
 
+    public List<Long> getCartItemIds() { return cartItemIds; }
+    public void setCartItemIds(List<Long> cartItemIds) { this.cartItemIds = cartItemIds; }
     public Long getBookId() { return bookId; }
     public void setBookId(Long bookId) { this.bookId = bookId; }
     public Integer getQuantity() { return quantity; }

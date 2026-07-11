@@ -11,4 +11,9 @@ public class TradeExceptionHandler {
     public ApiResponse<Void> handleTradeException(TradeException ex) {
         return ApiResponse.error(ex.getCode(), ex.getMessage());
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ApiResponse<Void> handleIllegalArgument(IllegalArgumentException ex) {
+        return ApiResponse.error(1002, ex.getMessage());
+    }
 }

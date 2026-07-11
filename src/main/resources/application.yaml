@@ -48,6 +48,16 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: 0
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:itheima}
+    password: ${RABBITMQ_PASSWORD:1234}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 10
 
 # 持久层：MyBatis-Plus（不使用 JPA / Hibernate）
 mybatis-plus:
@@ -90,6 +100,18 @@ bookstore:
     enabled: true
     detail-ttl-seconds: 1800
     detail-ttl-jitter-seconds: 300
+    bloom-enabled: true
+    bloom-expected-elements: 100000
+    bloom-false-positive-rate: 0.01
+    bloom-warmup-on-startup: true
+  borrow:
+    overdue:
+      enabled: true
+      poll-interval-ms: 60000
+      batch-size: 100
+  trade:
+    unpaid-cancel-delay-minutes: 15
+    # unpaid-cancel-delay-ms: 60000  # 联调时可改为 1 分钟
 
 checkin:
   frontend-base-url: ${CHECKIN_FRONTEND_URL:http://localhost:5173}

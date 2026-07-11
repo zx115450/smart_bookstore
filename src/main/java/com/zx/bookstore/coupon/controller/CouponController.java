@@ -3,6 +3,7 @@ package com.zx.bookstore.coupon.controller;
 import com.zx.auth.dto.ApiResponse;
 import com.zx.auth.security.AuthAttributes;
 import com.zx.auth.security.AuthPrincipal;
+import com.zx.bookstore.coupon.dto.AvailableCouponResponse;
 import com.zx.bookstore.coupon.dto.UserCouponResponse;
 import com.zx.bookstore.coupon.service.CouponService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -29,5 +31,14 @@ public class CouponController {
             @RequestParam(required = false) String status
     ) {
         return ApiResponse.ok(couponService.listMine(principal.userId(), status));
+    }
+
+    @PreAuthorize("hasRole('USER')")
+    @GetMapping("/available")
+    public ApiResponse<List<AvailableCouponResponse>> listAvailable(
+            @RequestAttribute(AuthAttributes.AUTH_USER) AuthPrincipal principal,
+            @RequestParam BigDecimal orderAmount
+    ) {
+        return ApiResponse.ok(couponService.listAvailable(principal.userId(), orderAmount));
     }
 }

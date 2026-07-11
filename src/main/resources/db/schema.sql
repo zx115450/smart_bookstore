@@ -258,6 +258,24 @@ CREATE TABLE IF NOT EXISTS book (
   KEY idx_book_title (title)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='图书';
 
+-- --------------------------------------------------
+-- 8.1) 书城：库存流水（审计）
+-- --------------------------------------------------
+CREATE TABLE IF NOT EXISTS book_stock_log (
+  id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  book_id     BIGINT UNSIGNED NOT NULL,
+  change_type ENUM('SALE_OUT','SALE_IN','BORROW_OUT','BORROW_IN','ADMIN_ADJUST') NOT NULL,
+  change_qty  INT NOT NULL COMMENT '变动数量（正数）',
+  ref_type    VARCHAR(32) NULL COMMENT 'trade_order/borrow_order/admin',
+  ref_id      BIGINT UNSIGNED NULL,
+  operator_id BIGINT UNSIGNED NULL,
+  remark      VARCHAR(255) NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_stock_log_book FOREIGN KEY (book_id) REFERENCES book(id),
+  KEY idx_stock_log_book (book_id),
+  KEY idx_stock_log_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='图书库存流水';
+
 INSERT INTO book_category (name, sort, status)
 SELECT '技术', 1, 1 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM book_category WHERE name = '技术');
@@ -315,7 +333,8 @@ CREATE TABLE IF NOT EXISTS borrow_order (
   UNIQUE KEY uk_borrow_order_no (order_no),
   KEY idx_borrow_user (user_id),
   KEY idx_borrow_book (book_id),
-  KEY idx_borrow_status (status)
+  KEY idx_borrow_status (status),
+  KEY idx_borrow_status_due (status, due_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='借阅单';
 
 -- --------------------------------------------------
@@ -386,6 +405,55 @@ WHERE NOT EXISTS (SELECT 1 FROM coupon_template WHERE name = 'CHECKIN_7');
 INSERT INTO coupon_template (name, coupon_type, threshold_amount, discount_amount, total_count, valid_days, status)
 SELECT '满50减10', 'FIXED', 50.00, 10.00, 1000, 7, 1 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM coupon_template WHERE name = '满50减10');
+
+-- --------------------------------------------------
+-- 11.5) 购物车
+-- --------------------------------------------------
+CREATE TABLE IF NOT EXISTS cart_item (
+  id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id     BIGINT UNSIGNED NOT NULL,
+  book_id     BIGINT UNSIGNED NOT NULL,
+  quantity    INT NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_cart_user FOREIGN KEY (user_id) REFERENCES auth_user(id),
+  CONSTRAINT fk_cart_book FOREIGN KEY (book_id) REFERENCES book(id),
+  UNIQUE KEY uk_cart_user_book (user_id, book_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='购物车';
+
+-- --------------------------------------------------
+-- 11.6) 秒杀活动
+-- --------------------------------------------------
+CREATE TABLE IF NOT EXISTS seckill_activity (
+  id              BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  name            VARCHAR(64) NOT NULL,
+  template_id     BIGINT UNSIGNED NOT NULL COMMENT '发放的券模板',
+  seckill_stock   INT NOT NULL COMMENT '秒杀总量',
+  start_time      DATETIME NOT NULL,
+  end_time        DATETIME NOT NULL,
+  status          TINYINT NOT NULL DEFAULT 1 COMMENT '1=启用 0=下架',
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_seckill_template FOREIGN KEY (template_id) REFERENCES coupon_template(id),
+  KEY idx_seckill_time (start_time, end_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='秒杀活动';
+
+CREATE TABLE IF NOT EXISTS seckill_order (
+  id              BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id         BIGINT UNSIGNED NOT NULL,
+  activity_id     BIGINT UNSIGNED NOT NULL,
+  status          ENUM('PROCESSING','SUCCESS','FAILED') NOT NULL DEFAULT 'PROCESSING',
+  idempotency_key VARCHAR(64) NULL,
+  user_coupon_id  BIGINT UNSIGNED NULL,
+  fail_reason     VARCHAR(255) NULL,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_so_user FOREIGN KEY (user_id) REFERENCES auth_user(id),
+  CONSTRAINT fk_so_activity FOREIGN KEY (activity_id) REFERENCES seckill_activity(id),
+  UNIQUE KEY uk_seckill_user_activity (user_id, activity_id),
+  UNIQUE KEY uk_seckill_idempotency (idempotency_key),
+  KEY idx_so_activity (activity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='秒杀参与记录';
 
 -- --------------------------------------------------
 -- 12) 购书订单（余额模拟支付）

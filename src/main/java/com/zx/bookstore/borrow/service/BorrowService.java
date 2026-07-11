@@ -11,6 +11,7 @@ import com.zx.bookstore.borrow.repository.BorrowOrderRepository;
 import com.zx.bookstore.catalog.dto.PageResult;
 import com.zx.bookstore.catalog.entity.Book;
 import com.zx.bookstore.catalog.repository.BookRepository;
+import com.zx.bookstore.catalog.service.BookStockLogService;
 import com.zx.bookstore.exception.BookstoreException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,8 @@ public class BorrowService {
     private final BorrowOrderRepository borrowOrderRepository;
     private final BookRepository bookRepository;
     private final AuthUserRepository authUserRepository;
+    private final BorrowDueRedisService borrowDueRedisService;
+    private final BookStockLogService bookStockLogService;
 
     @Transactional
     public BorrowOrderResponse apply(AuthPrincipal principal, CreateBorrowOrderRequest req) {
@@ -83,11 +86,11 @@ public class BorrowService {
     @Transactional
     public BorrowOrderResponse returnBook(AuthPrincipal principal, Long orderId) {
         BorrowOrder order = loadOwnedOrder(principal, orderId);
-        return doReturn(order);
+        return doReturn(order, principal.userId());
     }
 
     @Transactional
-    public BorrowOrderResponse confirm(Long orderId) {
+    public BorrowOrderResponse confirm(Long orderId, Long operatorId) {
         BorrowOrder order = borrowOrderRepository.findById(orderId)
                 .orElseThrow(BorrowException::orderNotFound);
         if (BorrowOrderStatus.BORROWED.name().equals(order.getStatus())) {
@@ -120,6 +123,8 @@ public class BorrowService {
         order.setStatus(BorrowOrderStatus.BORROWED.name());
         order.setBorrowAt(now);
         order.setDueAt(dueAt);
+        borrowDueRedisService.scheduleDue(orderId, dueAt);
+        bookStockLogService.recordBorrowOut(order.getBookId(), 1, orderId, operatorId);
         return buildResponse(order);
     }
 
@@ -143,10 +148,10 @@ public class BorrowService {
     }
 
     @Transactional
-    public BorrowOrderResponse adminReturn(Long orderId) {
+    public BorrowOrderResponse adminReturn(Long orderId, Long operatorId) {
         BorrowOrder order = borrowOrderRepository.findById(orderId)
                 .orElseThrow(BorrowException::orderNotFound);
-        return doReturn(order);
+        return doReturn(order, operatorId);
     }
 
     public BorrowOrderResponse getOrder(AuthPrincipal principal, Long orderId) {
@@ -176,7 +181,7 @@ public class BorrowService {
         return new PageResult<>(safePage, safeSize, borrowOrderRepository.countAll(status), records);
     }
 
-    private BorrowOrderResponse doReturn(BorrowOrder order) {
+    private BorrowOrderResponse doReturn(BorrowOrder order, Long operatorId) {
         if (BorrowOrderStatus.RETURNED.name().equals(order.getStatus())) {
             return buildResponse(order);
         }
@@ -199,6 +204,8 @@ public class BorrowService {
 
         order.setStatus(BorrowOrderStatus.RETURNED.name());
         order.setReturnAt(now);
+        borrowDueRedisService.removeDue(order.getId());
+        bookStockLogService.recordBorrowIn(order.getBookId(), 1, order.getId(), operatorId);
         return buildResponse(order);
     }
 

@@ -38,6 +38,62 @@ public class CouponRepository {
         return Optional.ofNullable(templateMapper.selectById(id));
     }
 
+    public List<CouponTemplate> pageTemplates(Integer status, long page, long size) {
+        long safePage = Math.max(1, page);
+        long safeSize = Math.min(Math.max(1, size), 100);
+        long offset = (safePage - 1) * safeSize;
+        var wrapper = Wrappers.<CouponTemplate>lambdaQuery()
+                .eq(status != null, CouponTemplate::getStatus, status)
+                .orderByDesc(CouponTemplate::getId)
+                .last("LIMIT " + safeSize + " OFFSET " + offset);
+        return templateMapper.selectList(wrapper);
+    }
+
+    public long countTemplates(Integer status) {
+        var wrapper = Wrappers.<CouponTemplate>lambdaQuery()
+                .eq(status != null, CouponTemplate::getStatus, status);
+        Long count = templateMapper.selectCount(wrapper);
+        return count == null ? 0 : count;
+    }
+
+    public boolean existsTemplateByNameExceptId(String name, Long excludeId) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        var wrapper = Wrappers.<CouponTemplate>lambdaQuery().eq(CouponTemplate::getName, name);
+        if (excludeId != null) {
+            wrapper.ne(CouponTemplate::getId, excludeId);
+        }
+        Long count = templateMapper.selectCount(wrapper);
+        return count != null && count > 0;
+    }
+
+    public CouponTemplate saveTemplate(CouponTemplate template) {
+        LocalDateTime now = LocalDateTime.now();
+        if (template.getId() == null) {
+            if (template.getCreatedAt() == null) {
+                template.setCreatedAt(now);
+            }
+            if (template.getIssuedCount() == null) {
+                template.setIssuedCount(0);
+            }
+            template.setUpdatedAt(now);
+            templateMapper.insert(template);
+            return template;
+        }
+        template.setUpdatedAt(now);
+        templateMapper.updateById(template);
+        return template;
+    }
+
+    public int updateTemplateStatus(Long id, int status) {
+        CouponTemplate update = new CouponTemplate();
+        update.setId(id);
+        update.setStatus(status);
+        update.setUpdatedAt(LocalDateTime.now());
+        return templateMapper.updateById(update);
+    }
+
     public boolean incrementIssuedCount(Long templateId) {
         return templateMapper.incrementIssuedCount(templateId) > 0;
     }

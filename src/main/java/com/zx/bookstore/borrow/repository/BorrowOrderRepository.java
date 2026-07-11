@@ -116,4 +116,12 @@ public class BorrowOrderRepository {
     public int updateToReturned(Long id, LocalDateTime returnAt) {
         return mapper.updateToReturned(id, returnAt);
     }
+
+    public int updateToOverdue(Long id) {
+        return mapper.updateToOverdue(id);
+    }
+
+    public int updateOverdueBatch(int limit) {
+        return mapper.updateOverdueBatch(limit);
+    }
 }

@@ -22,4 +22,11 @@ public interface TradeOrderMapper extends BaseMapper<TradeOrder> {
             WHERE id = #{id} AND status = 'PENDING_PAY' AND user_id = #{userId}
             """)
     int markCancelled(@Param("id") Long id, @Param("userId") Long userId);
+
+    @Update("""
+            UPDATE trade_order
+            SET status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW()
+            WHERE id = #{id} AND status = 'PENDING_PAY'
+            """)
+    int markCancelledByTimeout(@Param("id") Long id);
 }
