@@ -1,6 +1,9 @@
 spring:
   application:
     name: Factory_Test_Demo
+  config:
+    # 本地密钥（已 gitignore）；也可用环境变量 DEEPSEEK_API_KEY / DASHSCOPE_API_KEY
+    import: optional:classpath:application-param.yaml
   sql:
     init:
       mode: always
@@ -58,6 +61,58 @@ spring:
       simple:
         acknowledge-mode: manual
         prefetch: 10
+  ai:
+    # 均走 OpenAI 兼容协议：chat=DeepSeek，embedding=千问(DashScope)
+    model:
+      chat: openai
+      embedding: openai
+    openai:
+      chat:
+        api-key: ${DEEPSEEK_API_KEY:${AI_API_KEY:}}
+        base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+        options:
+          model: ${ai.chat-model}
+          temperature: ${ai.temperature}
+      embedding:
+        api-key: ${DASHSCOPE_API_KEY:${AI_EMBEDDING_API_KEY:}}
+        # Spring AI 会自动拼接 /v1 → .../compatible-mode/v1
+        base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+        options:
+          model: ${ai.embedding-model}
+          dimensions: ${ai.embedding-dimension}
+    vectorstore:
+      milvus:
+        client:
+          host: ${MILVUS_HOST:localhost}
+          port: ${MILVUS_PORT:19530}
+        database-name: default
+        collection-name: bookstore_book
+        # 须与千问 text-embedding-v3 输出维度一致（默认 1024）
+        embedding-dimension: ${ai.embedding-dimension}
+        initialize-schema: true
+        index-type: IVF_FLAT
+        metric-type: COSINE
+
+# AI 业务侧配置（会话 / 限流 / 模型名）
+ai:
+  enabled: true
+  chat-model: deepseek-chat
+  embedding-model: text-embedding-v3
+  embedding-dimension: 1024
+  temperature: 0.3
+  max-history-turns: 6
+  rate-limit:
+    per-user-hourly: 30
+  session:
+    ttl-minutes: 30
+  # RAG + Milvus 向量检索（G 板块）：默认关闭，开启需本地启动 Milvus 并配置 DASHSCOPE_API_KEY
+  rag:
+    enabled: false
+    # 语义召回参数
+    top-k: 8
+    similarity-threshold: 0.6
+    # 启动时是否全量预热索引（默认关闭，量大时耗时）
+    prewarm-on-startup: false
 
 # 持久层：MyBatis-Plus（不使用 JPA / Hibernate）
 mybatis-plus:

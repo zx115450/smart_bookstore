@@ -37,6 +37,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/oauth/qq/callback"
     );
 
+    /**
+     * 可选鉴权路径：无 Token 时放行（匿名），有 Token 时解析并写入 {@link AuthPrincipal}。
+     * AI 聊天接口走此模式：匿名可对话，登录后可调用个人借阅等 Tool。
+     */
+    private static final List<String> OPTIONAL_AUTH_PATHS = List.of(
+            "/api/ai/chat"
+    );
+
     private final JwtService jwtService;
     private final AuthSessionRepository sessionRepository;
     private final AuthUserRepository userRepository;
@@ -57,13 +65,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+        boolean optionalAuth = OPTIONAL_AUTH_PATHS.contains(request.getRequestURI());
         if (authorization == null || !authorization.startsWith("Bearer ")) {
+            if (optionalAuth) {
+                // 匿名放行：不写入 AuthPrincipal，后续按匿名处理
+                filterChain.doFilter(request, response);
+                return;
+            }
             writeUnauthorized(response, 2003, "missing or invalid authorization header");
             return;
         }
 
         String token = authorization.substring(7).trim();
         if (token.isEmpty()) {
+            if (optionalAuth) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             writeUnauthorized(response, 2003, "missing or invalid authorization header");
             return;
         }

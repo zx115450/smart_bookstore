@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -117,5 +118,11 @@ public class TradeOrderRepository {
         }
         Long count = orderMapper.selectCount(wrapper);
         return count == null ? 0 : count;
+    }
+
+    /** 推荐热度：按 book_id 聚合已支付订单的商品销量（SUM quantity），TopN。 */
+    public List<Map<String, Object>> findHotPaidBooks(int limit) {
+        int safe = Math.min(Math.max(limit, 1), 200);
+        return itemMapper.findHotPaidBooks(safe);
     }
 }

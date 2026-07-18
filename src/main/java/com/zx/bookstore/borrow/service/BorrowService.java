@@ -10,8 +10,11 @@ import com.zx.bookstore.borrow.exception.BorrowException;
 import com.zx.bookstore.borrow.repository.BorrowOrderRepository;
 import com.zx.bookstore.catalog.dto.PageResult;
 import com.zx.bookstore.catalog.entity.Book;
+import com.zx.bookstore.catalog.entity.Bookshelf;
 import com.zx.bookstore.catalog.repository.BookRepository;
+import com.zx.bookstore.catalog.repository.BookshelfRepository;
 import com.zx.bookstore.catalog.service.BookStockLogService;
+import com.zx.bookstore.catalog.support.ShelfLocationSupport;
 import com.zx.bookstore.exception.BookstoreException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,7 @@ public class BorrowService {
 
     private final BorrowOrderRepository borrowOrderRepository;
     private final BookRepository bookRepository;
+    private final BookshelfRepository bookshelfRepository;
     private final AuthUserRepository authUserRepository;
     private final BorrowDueRedisService borrowDueRedisService;
     private final BookStockLogService bookStockLogService;
@@ -235,8 +239,17 @@ public class BorrowService {
         authUserRepository.findById(order.getUserId())
                 .ifPresent(user -> resp.setUsername(user.getUsername()));
         resp.setBookId(order.getBookId());
-        bookRepository.findById(order.getBookId())
-                .ifPresent(book -> resp.setBookTitle(book.getTitle()));
+        bookRepository.findById(order.getBookId()).ifPresent(book -> {
+            resp.setBookTitle(book.getTitle());
+            if (book.getBookshelfId() != null) {
+                bookshelfRepository.findById(book.getBookshelfId()).ifPresent(bookshelf -> {
+                    resp.setBookshelfFloor(bookshelf.getFloor());
+                    resp.setBookshelfCode(bookshelf.getCode());
+                    resp.setShelfLayer(book.getShelfLayer());
+                    resp.setShelfLocation(ShelfLocationSupport.format(bookshelf, book.getShelfLayer()));
+                });
+            }
+        });
         resp.setStatus(order.getStatus());
         resp.setBorrowAt(formatDateTime(order.getBorrowAt()));
         resp.setDueAt(formatDateTime(order.getDueAt()));

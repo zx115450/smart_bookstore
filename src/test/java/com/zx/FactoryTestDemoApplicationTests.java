@@ -9,9 +9,19 @@ class FactoryTestDemoApplicationTests {
 
     @Test
     void contextLoads() {
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-        String encode = encoder.encode("123456");
-        System.out.println(encode);
+       long a = 1L;
+       long b= 1000000000L;
+       long [] map = new long[10];
+       long  s = System.currentTimeMillis();
+       for (long i=a;i<=b;i++) {
+           long x = i;
+           while (x>0) {
+                map[Math.toIntExact(x % 10)]++;
+                x/=10;
+            }
+       }
+       long e = System.currentTimeMillis();
+        System.out.println(e - s);
     }
 
 }

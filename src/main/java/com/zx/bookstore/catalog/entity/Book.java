@@ -41,6 +41,12 @@ public class Book {
     @TableField("borrow_days")
     private Integer borrowDays = 30;
 
+    @TableField("bookshelf_id")
+    private Long bookshelfId;
+
+    @TableField("shelf_layer")
+    private Integer shelfLayer;
+
     @TableField("status")
     private Integer status = 1;
 
@@ -73,6 +79,10 @@ public class Book {
     public void setBorrowStock(Integer borrowStock) { this.borrowStock = borrowStock; }
     public Integer getBorrowDays() { return borrowDays; }
     public void setBorrowDays(Integer borrowDays) { this.borrowDays = borrowDays; }
+    public Long getBookshelfId() { return bookshelfId; }
+    public void setBookshelfId(Long bookshelfId) { this.bookshelfId = bookshelfId; }
+    public Integer getShelfLayer() { return shelfLayer; }
+    public void setShelfLayer(Integer shelfLayer) { this.shelfLayer = shelfLayer; }
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }
     public String getDescription() { return description; }

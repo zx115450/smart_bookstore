@@ -225,8 +225,19 @@ SELECT '图书馆 A 区', '主楼 3 层东侧', 30, 1
 WHERE NOT EXISTS (SELECT 1 FROM reservation_resource WHERE name = '图书馆 A 区');
 
 -- --------------------------------------------------
--- 8) 书城：图书分类与图书（P0）
+-- 8) 书城：书架与图书（P0）
 -- --------------------------------------------------
+CREATE TABLE IF NOT EXISTS bookshelf (
+  id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  floor       INT NOT NULL COMMENT '所在楼层（第几楼）',
+  code        VARCHAR(32) NOT NULL COMMENT '书架编号，如 A-01',
+  status      TINYINT NOT NULL DEFAULT 1 COMMENT '1=启用 0=禁用',
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_bookshelf_floor_code (floor, code),
+  KEY idx_bookshelf_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='书架';
+
 CREATE TABLE IF NOT EXISTS book_category (
   id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   name        VARCHAR(64) NOT NULL,
@@ -248,12 +259,16 @@ CREATE TABLE IF NOT EXISTS book (
   sale_stock      INT NOT NULL DEFAULT 0 COMMENT '可售库存',
   borrow_stock    INT NOT NULL DEFAULT 0 COMMENT '可借册数',
   borrow_days     INT NOT NULL DEFAULT 30 COMMENT '默认借阅天数',
+  bookshelf_id    BIGINT UNSIGNED NULL COMMENT '所在书架（可借图书须配置）',
+  shelf_layer     INT NULL COMMENT '书架层数（从上往下第几层）',
   status          TINYINT NOT NULL DEFAULT 1 COMMENT '1=上架 0=下架',
   description     TEXT NULL,
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_book_category FOREIGN KEY (category_id) REFERENCES book_category(id),
+  CONSTRAINT fk_book_bookshelf FOREIGN KEY (bookshelf_id) REFERENCES bookshelf(id),
   KEY idx_book_category (category_id),
+  KEY idx_book_bookshelf (bookshelf_id),
   KEY idx_book_status (status),
   KEY idx_book_title (title)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='图书';
@@ -275,6 +290,18 @@ CREATE TABLE IF NOT EXISTS book_stock_log (
   KEY idx_stock_log_book (book_id),
   KEY idx_stock_log_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='图书库存流水';
+
+INSERT INTO bookshelf (floor, code, status)
+SELECT 2, 'A-01', 1 FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM bookshelf WHERE floor = 2 AND code = 'A-01');
+
+INSERT INTO bookshelf (floor, code, status)
+SELECT 2, 'A-02', 1 FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM bookshelf WHERE floor = 2 AND code = 'A-02');
+
+INSERT INTO bookshelf (floor, code, status)
+SELECT 3, 'B-01', 1 FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM bookshelf WHERE floor = 3 AND code = 'B-01');
 
 INSERT INTO book_category (name, sort, status)
 SELECT '技术', 1, 1 FROM DUAL
@@ -313,6 +340,31 @@ SELECT c.id, '9787020008735', '三国演义', '罗贯中', 49.00, 80, 15, 1, '�
 FROM book_category c
 WHERE c.name = '文学'
   AND NOT EXISTS (SELECT 1 FROM book WHERE title = '三国演义');
+
+UPDATE book b
+JOIN bookshelf s ON s.floor = 2 AND s.code = 'A-01'
+SET b.bookshelf_id = s.id, b.shelf_layer = 3
+WHERE b.title = 'Java 核心技术' AND b.bookshelf_id IS NULL;
+
+UPDATE book b
+JOIN bookshelf s ON s.floor = 2 AND s.code = 'A-01'
+SET b.bookshelf_id = s.id, b.shelf_layer = 2
+WHERE b.title = 'Spring Boot 实战' AND b.bookshelf_id IS NULL;
+
+UPDATE book b
+JOIN bookshelf s ON s.floor = 2 AND s.code = 'A-02'
+SET b.bookshelf_id = s.id, b.shelf_layer = 4
+WHERE b.title = 'Redis 设计与实现' AND b.bookshelf_id IS NULL;
+
+UPDATE book b
+JOIN bookshelf s ON s.floor = 3 AND s.code = 'B-01'
+SET b.bookshelf_id = s.id, b.shelf_layer = 2
+WHERE b.title = '红楼梦' AND b.bookshelf_id IS NULL;
+
+UPDATE book b
+JOIN bookshelf s ON s.floor = 3 AND s.code = 'B-01'
+SET b.bookshelf_id = s.id, b.shelf_layer = 1
+WHERE b.title = '三国演义' AND b.bookshelf_id IS NULL;
 
 -- --------------------------------------------------
 -- 9) 书城：借阅单（P1）

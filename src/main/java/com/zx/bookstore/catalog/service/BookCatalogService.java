@@ -3,8 +3,11 @@ package com.zx.bookstore.catalog.service;
 import com.zx.bookstore.catalog.dto.*;
 import com.zx.bookstore.catalog.entity.Book;
 import com.zx.bookstore.catalog.entity.BookCategory;
+import com.zx.bookstore.catalog.entity.Bookshelf;
 import com.zx.bookstore.catalog.repository.BookCategoryRepository;
 import com.zx.bookstore.catalog.repository.BookRepository;
+import com.zx.bookstore.catalog.repository.BookshelfRepository;
+import com.zx.bookstore.catalog.support.ShelfLocationSupport;
 import com.zx.bookstore.exception.BookstoreException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +27,7 @@ public class BookCatalogService {
 
     private final BookRepository bookRepository;
     private final BookCategoryRepository categoryRepository;
+    private final BookshelfRepository bookshelfRepository;
     private final BookRedisService bookRedisService;
     private final BookStockLogService bookStockLogService;
     /** 布隆过滤器：用户详情读路径防缓存穿透（管理端详情不走布隆）。 */
@@ -33,8 +37,9 @@ public class BookCatalogService {
         List<Book> books = bookRepository.pageEnabled(categoryId, keyword, page, size);
         long total = bookRepository.countEnabled(categoryId, keyword);
         Map<Long, String> categoryNameById = categoryNameById(books);
+        Map<Long, Bookshelf> bookshelfById = bookshelfById(books);
         List<BookResponse> records = books.stream()
-                .map(b -> toResponse(b, categoryNameById.get(b.getCategoryId())))
+                .map(b -> toResponse(b, categoryNameById.get(b.getCategoryId()), bookshelfById.get(b.getBookshelfId())))
                 .collect(Collectors.toList());
         return new PageResult<>(Math.max(1, page), Math.min(Math.max(1, size), 100), total, records);
     }
@@ -54,7 +59,10 @@ public class BookCatalogService {
         String categoryName = categoryRepository.findById(book.getCategoryId())
                 .map(BookCategory::getName)
                 .orElse(null);
-        BookResponse response = toResponse(book, categoryName);
+        Bookshelf bookshelf = book.getBookshelfId() == null
+                ? null
+                : bookshelfRepository.findById(book.getBookshelfId()).orElse(null);
+        BookResponse response = toResponse(book, categoryName, bookshelf);
         bookRedisService.put(response);
         return response;
     }
@@ -69,8 +77,9 @@ public class BookCatalogService {
         List<Book> books = bookRepository.pageAll(categoryId, keyword, status, page, size);
         long total = bookRepository.countAll(categoryId, keyword, status);
         Map<Long, String> categoryNameById = categoryNameById(books);
+        Map<Long, Bookshelf> bookshelfById = bookshelfById(books);
         List<BookResponse> records = books.stream()
-                .map(b -> toResponse(b, categoryNameById.get(b.getCategoryId())))
+                .map(b -> toResponse(b, categoryNameById.get(b.getCategoryId()), bookshelfById.get(b.getBookshelfId())))
                 .collect(Collectors.toList());
         return new PageResult<>(Math.max(1, page), Math.min(Math.max(1, size), 100), total, records);
     }
@@ -81,7 +90,10 @@ public class BookCatalogService {
         String categoryName = categoryRepository.findById(book.getCategoryId())
                 .map(BookCategory::getName)
                 .orElse(null);
-        return toResponse(book, categoryName);
+        Bookshelf bookshelf = book.getBookshelfId() == null
+                ? null
+                : bookshelfRepository.findById(book.getBookshelfId()).orElse(null);
+        return toResponse(book, categoryName, bookshelf);
     }
 
     public List<BookCategoryResponse> listCategoriesAdmin() {
@@ -97,11 +109,15 @@ public class BookCatalogService {
                 .orElseThrow(BookstoreException::categoryNotFound);
         Book book = new Book();
         applyCreate(book, req);
+        validateBorrowShelfLocation(book);
         book.setStatus(1);
         bookRepository.save(book);
         // 增量写入布隆，避免重启前新建的书被误判为不存在
         bookBloomRedisService.add(book.getId());
-        return toResponse(book, category.getName());
+        Bookshelf bookshelf = book.getBookshelfId() == null
+                ? null
+                : bookshelfRepository.findById(book.getBookshelfId()).orElse(null);
+        return toResponse(book, category.getName(), bookshelf);
     }
 
     @Transactional
@@ -145,13 +161,23 @@ public class BookCatalogService {
         if (req.getDescription() != null) {
             book.setDescription(req.getDescription());
         }
+        if (req.getBookshelfId() != null) {
+            book.setBookshelfId(req.getBookshelfId());
+        }
+        if (req.getShelfLayer() != null) {
+            book.setShelfLayer(req.getShelfLayer());
+        }
+        validateBorrowShelfLocation(book);
         bookRepository.save(book);
         recordAdminStockAdjust(id, oldSaleStock, book.getSaleStock(), oldBorrowStock, book.getBorrowStock(), operatorId);
         bookRedisService.evict(id);
         String categoryName = categoryRepository.findById(book.getCategoryId())
                 .map(BookCategory::getName)
                 .orElse(null);
-        return toResponse(book, categoryName);
+        Bookshelf bookshelf = book.getBookshelfId() == null
+                ? null
+                : bookshelfRepository.findById(book.getBookshelfId()).orElse(null);
+        return toResponse(book, categoryName, bookshelf);
     }
 
     @Transactional
@@ -261,6 +287,33 @@ public class BookCatalogService {
         return categoryRepository.findNamesByIds(categoryIds);
     }
 
+    private Map<Long, Bookshelf> bookshelfById(List<Book> books) {
+        List<Long> bookshelfIds = books.stream()
+                .map(Book::getBookshelfId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+        if (bookshelfIds.isEmpty()) {
+            return Map.of();
+        }
+        return bookshelfRepository.findByIds(bookshelfIds);
+    }
+
+    private void validateBorrowShelfLocation(Book book) {
+        int borrowStock = book.getBorrowStock() == null ? 0 : book.getBorrowStock();
+        if (borrowStock <= 0) {
+            return;
+        }
+        if (book.getBookshelfId() == null) {
+            throw new IllegalArgumentException("可借图书须配置书架");
+        }
+        if (book.getShelfLayer() == null || book.getShelfLayer() <= 0) {
+            throw new IllegalArgumentException("可借图书须配置书架层数（shelfLayer 为正整数）");
+        }
+        bookshelfRepository.findEnabledById(book.getBookshelfId())
+                .orElseThrow(BookstoreException::bookshelfNotFound);
+    }
+
     private void applyCreate(Book book, CreateBookRequest req) {
         book.setCategoryId(req.getCategoryId());
         book.setIsbn(req.getIsbn());
@@ -272,9 +325,11 @@ public class BookCatalogService {
         book.setBorrowStock(req.getBorrowStock() == null ? 0 : req.getBorrowStock());
         book.setBorrowDays(req.getBorrowDays() == null ? 30 : req.getBorrowDays());
         book.setDescription(req.getDescription());
+        book.setBookshelfId(req.getBookshelfId());
+        book.setShelfLayer(req.getShelfLayer());
     }
 
-    private BookResponse toResponse(Book book, String categoryName) {
+    private BookResponse toResponse(Book book, String categoryName, Bookshelf bookshelf) {
         BookResponse resp = new BookResponse();
         resp.setId(book.getId());
         resp.setCategoryId(book.getCategoryId());
@@ -289,6 +344,13 @@ public class BookCatalogService {
         resp.setBorrowDays(book.getBorrowDays());
         resp.setStatus(book.getStatus());
         resp.setDescription(book.getDescription());
+        resp.setBookshelfId(book.getBookshelfId());
+        resp.setShelfLayer(book.getShelfLayer());
+        if (bookshelf != null) {
+            resp.setBookshelfFloor(bookshelf.getFloor());
+            resp.setBookshelfCode(bookshelf.getCode());
+            resp.setShelfLocation(ShelfLocationSupport.format(bookshelf, book.getShelfLayer()));
+        }
         return resp;
     }
 

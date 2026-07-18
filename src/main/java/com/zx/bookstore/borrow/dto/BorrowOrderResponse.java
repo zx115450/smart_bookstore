@@ -8,6 +8,10 @@ public class BorrowOrderResponse {
     private String username;
     private Long bookId;
     private String bookTitle;
+    private Integer bookshelfFloor;
+    private String bookshelfCode;
+    private Integer shelfLayer;
+    private String shelfLocation;
     private String status;
     private String borrowAt;
     private String dueAt;
@@ -26,6 +30,14 @@ public class BorrowOrderResponse {
     public void setBookId(Long bookId) { this.bookId = bookId; }
     public String getBookTitle() { return bookTitle; }
     public void setBookTitle(String bookTitle) { this.bookTitle = bookTitle; }
+    public Integer getBookshelfFloor() { return bookshelfFloor; }
+    public void setBookshelfFloor(Integer bookshelfFloor) { this.bookshelfFloor = bookshelfFloor; }
+    public String getBookshelfCode() { return bookshelfCode; }
+    public void setBookshelfCode(String bookshelfCode) { this.bookshelfCode = bookshelfCode; }
+    public Integer getShelfLayer() { return shelfLayer; }
+    public void setShelfLayer(Integer shelfLayer) { this.shelfLayer = shelfLayer; }
+    public String getShelfLocation() { return shelfLocation; }
+    public void setShelfLocation(String shelfLocation) { this.shelfLocation = shelfLocation; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getBorrowAt() { return borrowAt; }

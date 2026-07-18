@@ -1,5 +1,6 @@
 package com.zx;
 
+import com.zx.ai.config.AiProperties;
 import com.zx.auth.config.AuthJwtProperties;
 import com.zx.auth.config.AuthQqOAuthProperties;
 import com.zx.auth.config.AuthRateLimitProperties;
@@ -23,7 +24,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         BookstoreCacheProperties.class,
         BookstoreBorrowOverdueProperties.class,
         CheckinProperties.class,
-        BookstoreTradeProperties.class
+        BookstoreTradeProperties.class,
+        AiProperties.class
 })
 public class FactoryTestDemoApplication {
 

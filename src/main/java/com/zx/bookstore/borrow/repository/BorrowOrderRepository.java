@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -123,5 +124,23 @@ public class BorrowOrderRepository {
 
     public int updateOverdueBatch(int limit) {
         return mapper.updateOverdueBatch(limit);
+    }
+
+    /** 推荐热度：按 book_id 聚合借阅单数（不限状态，历史借阅均计入），TopN。 */
+    public List<Map<String, Object>> findHotBorrowBooks(int limit) {
+        int safe = Math.min(Math.max(limit, 1), 200);
+        return mapper.findHotBorrowBooks(safe);
+    }
+
+    /**
+     * 共现召回：与目标用户借过相同书的其他用户，再聚合他们借过的其他书（排除目标用户自己的书）。
+     * 用于个性化推荐（H 板块）。bookIds 为空时返回空列表。
+     */
+    public List<Map<String, Object>> findCoBorrowedBooks(Long userId, List<Long> bookIds, int limit) {
+        if (userId == null || bookIds == null || bookIds.isEmpty()) {
+            return List.of();
+        }
+        int safe = Math.min(Math.max(limit, 1), 200);
+        return mapper.findCoBorrowedBooks(userId, bookIds, safe);
     }
 }

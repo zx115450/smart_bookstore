@@ -13,6 +13,8 @@ public class CreateBookRequest {
     private Integer borrowStock;
     private Integer borrowDays;
     private String description;
+    private Long bookshelfId;
+    private Integer shelfLayer;
 
     public Long getCategoryId() { return categoryId; }
     public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
@@ -34,4 +36,8 @@ public class CreateBookRequest {
     public void setBorrowDays(Integer borrowDays) { this.borrowDays = borrowDays; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public Long getBookshelfId() { return bookshelfId; }
+    public void setBookshelfId(Long bookshelfId) { this.bookshelfId = bookshelfId; }
+    public Integer getShelfLayer() { return shelfLayer; }
+    public void setShelfLayer(Integer shelfLayer) { this.shelfLayer = shelfLayer; }
 }

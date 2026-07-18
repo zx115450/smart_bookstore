@@ -5,6 +5,7 @@ import com.zx.auth.security.AuthAttributes;
 import com.zx.auth.security.AuthPrincipal;
 import com.zx.bookstore.catalog.dto.*;
 import com.zx.bookstore.catalog.service.BookCatalogService;
+import com.zx.bookstore.catalog.service.BookshelfService;
 import com.zx.bookstore.catalog.service.BookStockLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +20,7 @@ public class BookAdminController {
 
     private final BookCatalogService bookCatalogService;
     private final BookStockLogService bookStockLogService;
+    private final BookshelfService bookshelfService;
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/books")
@@ -96,6 +98,39 @@ public class BookAdminController {
     @DeleteMapping("/book-categories/{id}")
     public ApiResponse<Void> disableCategory(@PathVariable Long id) {
         bookCatalogService.disableCategory(id);
+        return ApiResponse.ok(null);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/bookshelves")
+    public ApiResponse<PageResult<BookshelfResponse>> listBookshelves(
+            @RequestParam(required = false) Integer floor,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "20") long size
+    ) {
+        return ApiResponse.ok(bookshelfService.listBookshelvesAdmin(floor, status, page, size));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/bookshelves")
+    public ApiResponse<BookshelfResponse> createBookshelf(@RequestBody CreateBookshelfRequest req) {
+        return ApiResponse.ok(bookshelfService.createBookshelf(req));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/bookshelves/{id}")
+    public ApiResponse<BookshelfResponse> updateBookshelf(
+            @PathVariable Long id,
+            @RequestBody UpdateBookshelfRequest req
+    ) {
+        return ApiResponse.ok(bookshelfService.updateBookshelf(id, req));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/bookshelves/{id}")
+    public ApiResponse<Void> disableBookshelf(@PathVariable Long id) {
+        bookshelfService.disableBookshelf(id);
         return ApiResponse.ok(null);
     }
 }

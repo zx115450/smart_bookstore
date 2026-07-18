@@ -14,6 +14,8 @@ public class UpdateBookRequest {
     private Integer borrowDays;
     private Integer status;
     private String description;
+    private Long bookshelfId;
+    private Integer shelfLayer;
 
     public Long getCategoryId() { return categoryId; }
     public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
@@ -37,4 +39,8 @@ public class UpdateBookRequest {
     public void setStatus(Integer status) { this.status = status; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public Long getBookshelfId() { return bookshelfId; }
+    public void setBookshelfId(Long bookshelfId) { this.bookshelfId = bookshelfId; }
+    public Integer getShelfLayer() { return shelfLayer; }
+    public void setShelfLayer(Integer shelfLayer) { this.shelfLayer = shelfLayer; }
 }

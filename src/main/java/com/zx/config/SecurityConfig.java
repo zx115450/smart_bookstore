@@ -36,9 +36,10 @@ public class SecurityConfig {
                                 "/api/auth/code/send",
                                 "/api/auth/logout",
                                 "/api/auth/oauth/qq/state",
-                                "/api/auth/oauth/qq/callback"
+                                "/api/auth/oauth/qq/callback",
+                                "/api/ai/chat"
                         ).permitAll()
-                        .requestMatchers("/api/admin/**", "/api/reservation/admin/**")
+                        .requestMatchers("/api/admin/**", "/api/reservation/admin/**", "/api/ai/admin/**")
                         .hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

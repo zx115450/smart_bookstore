@@ -16,6 +16,11 @@ public class BookResponse {
     private Integer borrowDays;
     private Integer status;
     private String description;
+    private Long bookshelfId;
+    private Integer bookshelfFloor;
+    private String bookshelfCode;
+    private Integer shelfLayer;
+    private String shelfLocation;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -43,4 +48,14 @@ public class BookResponse {
     public void setStatus(Integer status) { this.status = status; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public Long getBookshelfId() { return bookshelfId; }
+    public void setBookshelfId(Long bookshelfId) { this.bookshelfId = bookshelfId; }
+    public Integer getBookshelfFloor() { return bookshelfFloor; }
+    public void setBookshelfFloor(Integer bookshelfFloor) { this.bookshelfFloor = bookshelfFloor; }
+    public String getBookshelfCode() { return bookshelfCode; }
+    public void setBookshelfCode(String bookshelfCode) { this.bookshelfCode = bookshelfCode; }
+    public Integer getShelfLayer() { return shelfLayer; }
+    public void setShelfLayer(Integer shelfLayer) { this.shelfLayer = shelfLayer; }
+    public String getShelfLocation() { return shelfLocation; }
+    public void setShelfLocation(String shelfLocation) { this.shelfLocation = shelfLocation; }
 }

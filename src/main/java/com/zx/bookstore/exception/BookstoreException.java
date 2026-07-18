@@ -20,4 +20,8 @@ public class BookstoreException extends RuntimeException {
     public static BookstoreException categoryNotFound() {
         return new BookstoreException(4005, "图书分类不存在或已禁用");
     }
+
+    public static BookstoreException bookshelfNotFound() {
+        return new BookstoreException(4006, "书架不存在或已禁用");
+    }
 }
