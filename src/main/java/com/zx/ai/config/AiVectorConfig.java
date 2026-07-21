@@ -1,7 +1,16 @@
 package com.zx.ai.config;
 
+import io.milvus.client.MilvusServiceClient;
+import io.milvus.param.R;
+import io.milvus.param.collection.LoadCollectionParam;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
@@ -10,16 +19,41 @@ import org.springframework.context.annotation.Import;
  * <p>
  * 显式 {@link Import} Milvus 自动装配：
  * <ul>
- *   <li>A 阶段为避免无 Milvus 时启动失败，在 {@code application.yaml} 用
- *       {@code spring.autoconfigure.exclude} 屏蔽了 Milvus 自动装配；</li>
- *   <li>开启 RAG 时本类显式 {@code @Import} 该自动装配（显式导入不受 autoconfigure exclude 影响），
- *       前提是本地已启动 Milvus（见 {@code docs/AI模块分板块实施流程.md} G.0.1）。</li>
+ *   <li>在 {@code application.yaml} 用 {@code spring.autoconfigure.exclude} 屏蔽默认自动装配；</li>
+ *   <li>开启 RAG 时本类显式 {@code @Import}（显式导入不受 exclude 影响）。</li>
  * </ul>
- * Embedding 模型由 {@code spring-ai-starter-model-openai} 按 {@code spring.ai.openai.embedding.*}
- * 自动提供（通义 text-embedding-v3，1024 维），Milvus 自动装配会复用该 {@code EmbeddingModel}。
+ * {@code initialize-schema=false}：Spring AI 2.0 会用空 indexName 调用 describeIndex，
+ * 在 Milvus 2.6 上即使已有 {@code embedding} 索引也会报 index not found。集合需事先建好；
+ * 本配置在启动时 {@code loadCollection}，避免重启后未加载导致检索失败。
  */
 @Configuration
 @ConditionalOnProperty(prefix = "ai.rag", name = "enabled", havingValue = "true")
 @Import(MilvusVectorStoreAutoConfiguration.class)
 public class AiVectorConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(AiVectorConfig.class);
+
+    @Bean
+    ApplicationRunner milvusCollectionLoader(
+            ObjectProvider<MilvusServiceClient> milvusClientProvider,
+            @Value("${spring.ai.vectorstore.milvus.database-name:default}") String databaseName,
+            @Value("${spring.ai.vectorstore.milvus.collection-name:bookstore_book}") String collectionName
+    ) {
+        return args -> {
+            MilvusServiceClient client = milvusClientProvider.getIfAvailable();
+            if (client == null) {
+                return;
+            }
+            R<?> r = client.loadCollection(LoadCollectionParam.newBuilder()
+                    .withDatabaseName(databaseName)
+                    .withCollectionName(collectionName)
+                    .build());
+            if (r.getException() != null) {
+                log.warn("Milvus loadCollection failed for {}/{}: {}",
+                        databaseName, collectionName, r.getException().getMessage());
+            } else {
+                log.info("Milvus collection loaded: {}/{}", databaseName, collectionName);
+            }
+        };
+    }
 }

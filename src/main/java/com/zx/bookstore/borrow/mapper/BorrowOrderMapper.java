@@ -62,6 +62,33 @@ public interface BorrowOrderMapper extends BaseMapper<BorrowOrder> {
             """)
     int updateOverdueBatch(@Param("limit") int limit);
 
+    @Select("""
+            SELECT DATE(created_at) AS date,
+                   SUM(CASE WHEN status = 'APPLIED' THEN 1 ELSE 0 END) AS appliedCount,
+                   SUM(CASE WHEN status = 'BORROWED' THEN 1 ELSE 0 END) AS borrowedCount,
+                   SUM(CASE WHEN status = 'RETURNED' THEN 1 ELSE 0 END) AS returnedCount,
+                   SUM(CASE WHEN status = 'OVERDUE' THEN 1 ELSE 0 END) AS overdueCount
+            FROM borrow_order
+            WHERE created_at >= #{start}
+            GROUP BY DATE(created_at)
+            ORDER BY date
+            """)
+    List<Map<String, Object>> borrowTrend(@Param("start") LocalDateTime start);
+
+    @Select("""
+            SELECT status, COUNT(*) AS cnt
+            FROM borrow_order
+            GROUP BY status
+            """)
+    List<Map<String, Object>> borrowByStatus();
+
+    @Select("""
+            SELECT COUNT(*) AS cnt
+            FROM borrow_order
+            WHERE DATE(created_at) = CURDATE()
+            """)
+    long todayBorrowCount();
+
     /**
      * 简化共现召回：找到与目标用户借过相同书的其他用户，再聚合他们借过的其他书。
      * <p>

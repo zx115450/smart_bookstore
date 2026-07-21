@@ -1,6 +1,6 @@
 package com.zx.bookstore.trade.controller;
 
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import com.zx.bookstore.catalog.dto.PageResult;
 import com.zx.bookstore.trade.dto.TradeOrderResponse;
 import com.zx.bookstore.trade.service.TradeService;

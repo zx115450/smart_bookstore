@@ -1,35 +1,31 @@
 package com.zx.bookstore.cart.exception;
 
-public class CartException extends RuntimeException {
+import com.zx.common.exception.BusinessException;
+import com.zx.common.exception.ErrorCode;
 
-    private final int code;
+public class CartException extends BusinessException {
 
     public CartException(int code, String message) {
-        super(message);
-        this.code = code;
-    }
-
-    public int getCode() {
-        return code;
+        super(code, message);
     }
 
     public static CartException itemNotFound() {
-        return new CartException(4151, "购物车项不存在");
+        return new CartException(ErrorCode.CART_ITEM_NOT_FOUND, "购物车项不存在");
     }
 
     public static CartException forbidden() {
-        return new CartException(4152, "无权操作他人购物车");
+        return new CartException(ErrorCode.CART_FORBIDDEN, "无权操作他人购物车");
     }
 
     public static CartException bookNotFound() {
-        return new CartException(4153, "图书不存在或已下架");
+        return new CartException(ErrorCode.CART_BOOK_NOT_FOUND, "图书不存在或已下架");
     }
 
     public static CartException outOfStock() {
-        return new CartException(4154, "库存不足");
+        return new CartException(ErrorCode.CART_OUT_OF_STOCK, "库存不足");
     }
 
     public static CartException emptyCart() {
-        return new CartException(4155, "购物车为空");
+        return new CartException(ErrorCode.CART_EMPTY, "购物车为空");
     }
 }

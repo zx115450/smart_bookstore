@@ -125,4 +125,16 @@ public class TradeOrderRepository {
         int safe = Math.min(Math.max(limit, 1), 200);
         return itemMapper.findHotPaidBooks(safe);
     }
+
+    public List<Map<String, Object>> revenueTrend(LocalDateTime start) {
+        return orderMapper.revenueTrend(start);
+    }
+
+    public List<Map<String, Object>> revenueByStatus() {
+        return orderMapper.revenueByStatus();
+    }
+
+    public Map<String, Object> todayRevenue() {
+        return orderMapper.todayRevenue();
+    }
 }

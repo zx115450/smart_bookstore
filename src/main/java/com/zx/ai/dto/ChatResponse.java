@@ -2,11 +2,16 @@ package com.zx.ai.dto;
 
 import java.util.List;
 
+/**
+ * AI 客服聊天响应：口语化文本 + 可选结构化卡片（书目 / 推荐）。
+ */
 public class ChatResponse {
 
+    /** 会话 ID，前端须在后续请求中回传。 */
     private String sessionId;
+    /** 模型最终回复文本。 */
     private String reply;
-    /** 结构化卡片，供前端渲染；无查书结果时为空列表 */
+    /** 结构化卡片，供前端渲染；无查书/推荐结果时为空列表。 */
     private List<ChatCard> cards;
 
     public ChatResponse() {

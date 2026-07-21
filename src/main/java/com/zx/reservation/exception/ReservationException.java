@@ -1,59 +1,55 @@
 package com.zx.reservation.exception;
 
-public class ReservationException extends RuntimeException {
+import com.zx.common.exception.BusinessException;
+import com.zx.common.exception.ErrorCode;
 
-    private final int code;
+public class ReservationException extends BusinessException {
 
     public ReservationException(int code, String message) {
-        super(message);
-        this.code = code;
-    }
-
-    public int getCode() {
-        return code;
+        super(code, message);
     }
 
     public static ReservationException slotNotFound() {
-        return new ReservationException(3001, "时段不存在或已关闭");
+        return new ReservationException(ErrorCode.RESERVATION_SLOT_NOT_FOUND, "时段不存在或已关闭");
     }
 
     public static ReservationException noCapacity() {
-        return new ReservationException(3002, "名额不足");
+        return new ReservationException(ErrorCode.RESERVATION_NO_CAPACITY, "名额不足");
     }
 
     public static ReservationException duplicateBooking() {
-        return new ReservationException(3003, "您已预约该时段");
+        return new ReservationException(ErrorCode.RESERVATION_DUPLICATE_BOOKING, "您已预约该时段");
     }
 
     public static ReservationException invalidStatus() {
-        return new ReservationException(3004, "当前状态不允许该操作");
+        return new ReservationException(ErrorCode.RESERVATION_INVALID_STATUS, "当前状态不允许该操作");
     }
 
     public static ReservationException forbidden() {
-        return new ReservationException(3005, "无权操作他人预约");
+        return new ReservationException(ErrorCode.RESERVATION_FORBIDDEN, "无权操作他人预约");
     }
 
     public static ReservationException dailyLimitExceeded() {
-        return new ReservationException(3006, "超过每日预约上限");
+        return new ReservationException(ErrorCode.RESERVATION_DAILY_LIMIT_EXCEEDED, "超过每日预约上限");
     }
 
     public static ReservationException resourceNotFound() {
-        return new ReservationException(3007, "自习室不存在或已下架");
+        return new ReservationException(ErrorCode.RESERVATION_RESOURCE_NOT_FOUND, "自习室不存在或已下架");
     }
 
     public static ReservationException seatNotFound() {
-        return new ReservationException(3010, "座位不存在或已停用");
+        return new ReservationException(ErrorCode.RESERVATION_SEAT_NOT_FOUND, "座位不存在或已停用");
     }
 
     public static ReservationException seatAlreadyBooked() {
-        return new ReservationException(3011, "该座位在该时段已被预约");
+        return new ReservationException(ErrorCode.RESERVATION_SEAT_ALREADY_BOOKED, "该座位在该时段已被预约");
     }
 
     public static ReservationException orderNotFound() {
-        return new ReservationException(3008, "预约单不存在");
+        return new ReservationException(ErrorCode.RESERVATION_ORDER_NOT_FOUND, "预约单不存在");
     }
 
     public static ReservationException slotExpired() {
-        return new ReservationException(3009, "时段已过期，无法预约");
+        return new ReservationException(ErrorCode.RESERVATION_SLOT_EXPIRED, "时段已过期，无法预约");
     }
 }

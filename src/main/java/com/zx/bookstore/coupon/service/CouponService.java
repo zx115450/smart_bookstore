@@ -137,7 +137,7 @@ public class CouponService {
     private UserCoupon issueCoupon(Long userId, CouponTemplate template, CouponObtainWay obtainWay) {
         if (template.getTotalCount() != null && template.getTotalCount() > 0) {
             if (!couponRepository.incrementIssuedCount(template.getId())) {
-                throw new CouponException(4105, "优惠券已发完");
+                throw CouponException.exhausted();
             }
         }
         UserCoupon coupon = new UserCoupon();

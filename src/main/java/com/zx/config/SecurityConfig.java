@@ -37,7 +37,13 @@ public class SecurityConfig {
                                 "/api/auth/logout",
                                 "/api/auth/oauth/qq/state",
                                 "/api/auth/oauth/qq/callback",
-                                "/api/ai/chat"
+                                "/api/ai/chat",
+                                // 供 VM 内 Prometheus 抓取；生产建议内网隔离或加鉴权
+                                "/actuator/health",
+                                "/actuator/info",
+                                "/actuator/prometheus",
+                                "/actuator/metrics",
+                                "/actuator/metrics/**"
                         ).permitAll()
                         .requestMatchers("/api/admin/**", "/api/reservation/admin/**", "/api/ai/admin/**")
                         .hasRole("ADMIN")

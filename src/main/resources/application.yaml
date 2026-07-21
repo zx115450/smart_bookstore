@@ -1,6 +1,13 @@
+server:
+  port: 8081
 spring:
   application:
     name: Factory_Test_Demo
+  # 默认排除 Milvus 自动装配，避免仅引入 starter 就强连；真正启用由 ai.rag.enabled=true
+  # 时 AiVectorConfig @Import（显式导入不受本 exclude 影响）。当前默认 ai.rag.enabled=true。
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration
   config:
     # 本地密钥（已 gitignore）；也可用环境变量 DEEPSEEK_API_KEY / DASHSCOPE_API_KEY
     import: optional:classpath:application-param.yaml
@@ -89,7 +96,9 @@ spring:
         collection-name: bookstore_book
         # 须与千问 text-embedding-v3 输出维度一致（默认 1024）
         embedding-dimension: ${ai.embedding-dimension}
-        initialize-schema: true
+        # Spring AI 2.0 + Milvus 2.6：initialize-schema 会用空 indexName 调 describeIndex，
+        # 即使已有 embedding 索引也会报 index not found 并可能导致启动失败。集合需已建好并建索引。
+        initialize-schema: false
         index-type: IVF_FLAT
         metric-type: COSINE
 
@@ -105,9 +114,9 @@ ai:
     per-user-hourly: 30
   session:
     ttl-minutes: 30
-  # RAG + Milvus 向量检索（G 板块）：默认关闭，开启需本地启动 Milvus 并配置 DASHSCOPE_API_KEY
+  # RAG + Milvus 向量检索：默认开启（需 VM 内 Milvus gRPC 正常，host/port 见 spring.ai.vectorstore.milvus）。
   rag:
-    enabled: false
+    enabled: true
     # 语义召回参数
     top-k: 8
     similarity-threshold: 0.6
@@ -121,8 +130,7 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-server:
-  port: 8081
+
 
 auth:
   jwt:
@@ -184,3 +192,19 @@ logging:
           controller: info
         bookstore:
           service: info
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  observations:
+    key-values:
+      region: local

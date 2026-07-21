@@ -105,10 +105,14 @@ public class RedisStringChatMemoryRepository implements ChatMemoryRepository {
         redis.delete(key(conversationId));
     }
 
+    /** Redis Key：{@code ai:chat:memory:{conversationId}}。 */
     private static String key(String conversationId) {
         return KEY_PREFIX + conversationId;
     }
 
+    /**
+     * Message → 可序列化行。跳过 TOOL 类型（工具中间态不落会话，节省 token 与存储）。
+     */
     private static Map<String, String> toRow(Message message) {
         if (message == null || message.getMessageType() == null) {
             return null;
@@ -127,6 +131,9 @@ public class RedisStringChatMemoryRepository implements ChatMemoryRepository {
         return row;
     }
 
+    /**
+     * Redis 行 → Message。兼容字段 {@code type} 与旧字段 {@code role}；未知类型丢弃。
+     */
     private static Message toMessage(Map<String, String> row) {
         if (row == null) {
             return null;

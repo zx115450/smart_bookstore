@@ -1,6 +1,6 @@
 package com.zx.reservation.controller;
 
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import com.zx.reservation.dto.*;
 import com.zx.reservation.service.ReservationService;
 import lombok.RequiredArgsConstructor;

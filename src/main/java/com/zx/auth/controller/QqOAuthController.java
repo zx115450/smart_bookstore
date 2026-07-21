@@ -1,7 +1,9 @@
 package com.zx.auth.controller;
 
-import com.zx.auth.dto.ApiResponse;
 import com.zx.auth.service.QqOAuthService;
+import com.zx.common.dto.ApiResponse;
+import com.zx.common.exception.ErrorCode;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +28,7 @@ public class QqOAuthController {
         try {
             return ApiResponse.ok(qqOAuthService.createState());
         } catch (IllegalStateException e) {
-            return ApiResponse.error(5001, e.getMessage());
+            return ApiResponse.error(ErrorCode.AUTH_OAUTH_CONFIG_ERROR, e.getMessage());
         }
     }
 

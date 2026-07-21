@@ -63,6 +63,11 @@ public class BookRepository {
         return mapper.selectList(wrapper);
     }
 
+    public long countAll() {
+        Long count = mapper.selectCount(Wrappers.emptyWrapper());
+        return count == null ? 0 : count;
+    }
+
     public long countAll(Long categoryId, String keyword, Integer status) {
         var wrapper = Wrappers.<Book>lambdaQuery()
                 .eq(categoryId != null, Book::getCategoryId, categoryId)

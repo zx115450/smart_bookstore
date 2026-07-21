@@ -8,6 +8,7 @@ import com.zx.auth.entity.AuthLoginAudit;
 import com.zx.auth.entity.AuthSession;
 import com.zx.auth.entity.AuthUser;
 import com.zx.auth.repository.*;
+import com.zx.auth.exception.AuthException;
 import com.zx.auth.service.login.LoginHandlerFactory;
 import com.zx.auth.service.sendcode.SendCodeHandlerFactory;
 import lombok.RequiredArgsConstructor;
@@ -60,7 +61,7 @@ public class AuthService {
         // user -> 创建session(refreshToken) , accessToken
 
         String type = req.getLoginType();
-        if (type == null) throw new IllegalArgumentException("loginType required");
+        if (type == null) throw AuthException.invalidParam("loginType required");
 
         String loginKey = resolveLoginKey(req);
         //检查是否因为登录次数过多而禁止登录

@@ -4,6 +4,7 @@ import com.zx.auth.repository.AuthSessionRepository;
 import com.zx.auth.repository.AuthUserRepository;
 import com.zx.auth.service.AuthRedisService;
 import com.zx.auth.service.JwtService;
+import com.zx.common.exception.ErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -72,7 +73,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 filterChain.doFilter(request, response);
                 return;
             }
-            writeUnauthorized(response, 2003, "missing or invalid authorization header");
+            writeUnauthorized(response, ErrorCode.TOKEN_MISSING, "missing or invalid authorization header");
             return;
         }
 
@@ -82,7 +83,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 filterChain.doFilter(request, response);
                 return;
             }
-            writeUnauthorized(response, 2003, "missing or invalid authorization header");
+            writeUnauthorized(response, ErrorCode.TOKEN_MISSING, "missing or invalid authorization header");
             return;
         }
 
@@ -90,25 +91,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             JwtService.AccessTokenClaims claims = jwtService.parseAccessToken(token);
             //Redis通过jti记录黑名单
             if (authRedisService.isAccessBlacklisted(claims.jti())) {
-                writeUnauthorized(response, 2006, "token revoked");
+                writeUnauthorized(response, ErrorCode.TOKEN_REVOKED, "token revoked");
                 return;
             }
             //redis通过记录Session校验RefreshToken的合法性
             var sessionOpt = sessionRepository.findById(claims.sessionId());
             if (sessionOpt.isEmpty() || sessionOpt.get().getRevokedAt() != null) {
-                writeUnauthorized(response, 2004, "session revoked or not found");
+                writeUnauthorized(response, ErrorCode.SESSION_REVOKED, "session revoked or not found");
                 return;
             }
             var session = sessionOpt.get();
             if (session.getAbsoluteExpiresAt() != null
                     && session.getAbsoluteExpiresAt().isBefore(LocalDateTime.now())) {
-                writeUnauthorized(response, 2004, "session expired");
+                writeUnauthorized(response, ErrorCode.SESSION_REVOKED, "session expired");
                 return;
             }
 
             var userOpt = userRepository.findById(claims.userId());
             if (userOpt.isEmpty() || userOpt.get().getStatus() == null || userOpt.get().getStatus() != 1) {
-                writeUnauthorized(response, 2005, "user disabled or not found");
+                writeUnauthorized(response, ErrorCode.USER_DISABLED, "user disabled or not found");
                 return;
             }
 
@@ -129,9 +130,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             filterChain.doFilter(request, response);
         } catch (JwtService.TokenExpiredException e) {
-            writeUnauthorized(response, 2002, "token expired");
+            writeUnauthorized(response, ErrorCode.TOKEN_EXPIRED, "token expired");
         } catch (JwtService.InvalidAccessTokenException e) {
-            writeUnauthorized(response, 2003, "invalid token");
+            writeUnauthorized(response, ErrorCode.TOKEN_INVALID, "invalid token");
         } finally {
             SecurityContextHolder.clearContext();
         }

@@ -25,6 +25,9 @@ public class BookSearchTool {
 
     private final BookCatalogService bookCatalogService;
 
+    /**
+     * 关键词检索上架图书；命中时写入 {@link ChatCardCollector} 供前端渲染。
+     */
     @Tool(
             name = "searchBooks",
             description = "按书名、作者或关键词检索本馆上架图书，返回书目列表（含架位 shelfLocation、借阅/售卖库存）。查有没有某本书、搜书时必须先调用本工具。"

@@ -23,6 +23,7 @@ public class ChatCard {
     public ChatCard() {
     }
 
+    /** 查书结果卡片（含可售库存，便于前端展示）。 */
     public static ChatCard book(Long bookId, String title, String author,
                                 String shelfLocation, Integer borrowStock, Integer saleStock) {
         ChatCard card = new ChatCard();
@@ -36,6 +37,7 @@ public class ChatCard {
         return card;
     }
 
+    /** 推荐结果卡片（含 recommendReason）。 */
     public static ChatCard recommend(Long bookId, String title, String author,
                                      String shelfLocation, Integer borrowStock, String reason) {
         ChatCard card = new ChatCard();

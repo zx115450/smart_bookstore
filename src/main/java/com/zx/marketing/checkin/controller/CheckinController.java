@@ -1,6 +1,6 @@
 package com.zx.marketing.checkin.controller;
 
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import com.zx.auth.security.AuthAttributes;
 import com.zx.auth.security.AuthPrincipal;
 import com.zx.marketing.checkin.dto.CheckinRequest;

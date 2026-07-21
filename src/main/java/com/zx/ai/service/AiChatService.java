@@ -18,6 +18,11 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * AI 对话应用服务：校验入参、构造会话键、注入鉴权上下文，再调用 {@link ChatClient}。
+ * <p>
+ * 不直接访问业务库；事实查询由模型通过 Tool 完成。ThreadLocal 上下文务必在 finally 中清理。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -26,6 +31,15 @@ public class AiChatService {
 
     private final ChatClient aiChatClient;
 
+    /**
+     * 执行一轮对话。
+     * <ol>
+     *   <li>生成或复用 {@code sessionId}（返回给前端，多轮必回传）</li>
+     *   <li>拼 {@code conversationId}：登录 {@code user:{userId}:{sessionId}}，匿名 {@code anon:{sessionId}}</li>
+     *   <li>写入 {@link AiUserContext} 供个人类 Tool 取 userId（禁止让模型传 userId）</li>
+     *   <li>调用 ChatClient；从 {@link ChatCardCollector} 取出本轮卡片</li>
+     * </ol>
+     */
     public ChatResponse chat(ChatRequest request, AuthPrincipal principal) {
         if (request == null || !StringUtils.hasText(request.getMessage())) {
             throw AiException.badRequest("message 不能为空");

@@ -120,6 +120,10 @@ public class FaqTool {
         return result;
     }
 
+    /**
+     * 关键词打分：原文完整包含 keyword +3；分词与 keyword 互相包含 +1。
+     * 分数越高越优先返回；0 分表示本条未命中。
+     */
     private int scoreEntry(FaqEntry entry, String rawQuery, List<String> queryTokens) {
         if (entry.keywords() == null || entry.keywords().isEmpty()) {
             return 0;
@@ -140,6 +144,7 @@ public class FaqTool {
         return score;
     }
 
+    /** 按中英文标点/空白切分，过滤过短碎片（长度小于 2），供模糊匹配。 */
     private static List<String> tokenize(String text) {
         List<String> tokens = new ArrayList<>();
         for (String t : text.split("[\\s,，。？?！!、；;:：]+")) {

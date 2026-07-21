@@ -1,6 +1,6 @@
 package com.zx.bookstore.seckill.controller;
 
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import com.zx.bookstore.seckill.dto.CreateSeckillActivityRequest;
 import com.zx.bookstore.seckill.dto.SeckillActivityResponse;
 import com.zx.bookstore.seckill.dto.UpdateSeckillActivityRequest;

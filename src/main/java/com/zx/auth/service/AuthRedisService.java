@@ -1,6 +1,7 @@
 package com.zx.auth.service;
 
 import com.zx.auth.config.AuthRateLimitProperties;
+import com.zx.auth.exception.AuthException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -60,13 +61,13 @@ public class AuthRedisService {
      */
     public void checkSendCodeRateLimit(String target, String clientIp) {
         if (!allow(PREFIX_LIMIT_SEND_TARGET_MIN + target, 1, rateLimitProperties.getSendCodePerTargetSeconds())) {
-            throw new IllegalArgumentException("发送太频繁，请稍后再试");
+            throw AuthException.sendCodeLimited("发送太频繁，请稍后再试");
         }
         if (!allow(PREFIX_LIMIT_SEND_TARGET_HOUR + target, rateLimitProperties.getSendCodePerTargetHourly(), 3600)) {
-            throw new IllegalArgumentException("该账号发送次数过多，请稍后再试");
+            throw AuthException.sendCodeLimited("该账号发送次数过多，请稍后再试");
         }
         if (clientIp != null && !allow(PREFIX_LIMIT_SEND_IP_HOUR + clientIp, rateLimitProperties.getSendCodePerIpHourly(), 3600)) {
-            throw new IllegalArgumentException("IP 发送次数过多，请稍后再试");
+            throw AuthException.sendCodeLimited("IP 发送次数过多，请稍后再试");
         }
     }
 
@@ -85,8 +86,7 @@ public class AuthRedisService {
         if (value != null) {
             long fails = Long.parseLong(value);
             if (fails >= rateLimitProperties.getLoginFailMax()) {
-                throw new IllegalArgumentException("登录失败次数过多，请"
-                        + rateLimitProperties.getLoginFailLockMinutes() + "分钟后再试");
+                throw AuthException.loginLocked(rateLimitProperties.getLoginFailLockMinutes());
             }
         }
     }
@@ -136,7 +136,7 @@ public class AuthRedisService {
     /** 保存 OAuth state，callback 校验通过后一次性消费。 */
     public void saveOAuthState(String state, long ttlSeconds) {
         if (state == null || state.isBlank()) {
-            throw new IllegalArgumentException("state required");
+            throw AuthException.oauthStateRequired();
         }
         redis.opsForValue().set(PREFIX_OAUTH_STATE + state, "1", Duration.ofSeconds(ttlSeconds));
     }

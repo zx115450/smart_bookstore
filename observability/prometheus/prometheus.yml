@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # 抓取 Windows 宿主机上的 Spring Boot（server.port=8081）
+  # Compose 跑在 VirtualBox CentOS NAT 时，宿主机地址一般为 10.0.2.2
+  - job_name: factory-test-demo
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - 10.0.2.2:8081
+        labels:
+          application: Factory_Test_Demo
+          env: local

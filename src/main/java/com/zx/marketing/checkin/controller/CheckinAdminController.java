@@ -1,6 +1,6 @@
 package com.zx.marketing.checkin.controller;
 
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import com.zx.marketing.checkin.dto.CheckinResponse;
 import com.zx.marketing.checkin.service.CheckinService;
 import lombok.RequiredArgsConstructor;

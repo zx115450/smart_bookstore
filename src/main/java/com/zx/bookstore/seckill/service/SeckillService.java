@@ -189,7 +189,7 @@ public class SeckillService {
         } catch (Exception e) {
             log.error("publish seckill order failed, userId={}, activityId={}", principal.userId(), activityId, e);
             seckillRedisService.rollbackGrab(activityId, principal.userId());
-            throw new SeckillException(4256, "系统繁忙，请稍后重试");
+            throw SeckillException.systemBusy();
         }
 
         SeckillGrabResponse response = new SeckillGrabResponse();
@@ -215,7 +215,7 @@ public class SeckillService {
             response.setStatus(SeckillOrderStatus.PROCESSING.name());
             return response;
         }
-        throw new SeckillException(4257, "尚未参与该活动");
+        throw SeckillException.notParticipated();
     }
 
     /**

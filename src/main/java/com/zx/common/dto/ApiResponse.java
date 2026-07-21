@@ -1,4 +1,4 @@
-package com.zx.auth.dto;
+package com.zx.common.dto;
 
 public class ApiResponse<T> {
     private int code;
@@ -45,4 +45,3 @@ public class ApiResponse<T> {
         this.data = data;
     }
 }
-

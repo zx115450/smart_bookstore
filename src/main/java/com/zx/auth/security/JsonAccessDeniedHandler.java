@@ -1,5 +1,6 @@
 package com.zx.auth.security;
 
+import com.zx.common.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,8 @@ public class JsonAccessDeniedHandler implements AccessDeniedHandler {
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write("{\"code\":3001,\"message\":\"access denied\",\"data\":null}");
+        response.getWriter().write(String.format(
+                "{\"code\":%d,\"message\":\"access denied\",\"data\":null}",
+                ErrorCode.ACCESS_DENIED));
     }
 }

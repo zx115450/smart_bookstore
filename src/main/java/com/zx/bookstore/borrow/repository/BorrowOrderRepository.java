@@ -126,6 +126,18 @@ public class BorrowOrderRepository {
         return mapper.updateOverdueBatch(limit);
     }
 
+    public List<Map<String, Object>> borrowTrend(LocalDateTime start) {
+        return mapper.borrowTrend(start);
+    }
+
+    public List<Map<String, Object>> borrowByStatus() {
+        return mapper.borrowByStatus();
+    }
+
+    public long todayBorrowCount() {
+        return mapper.todayBorrowCount();
+    }
+
     /** 推荐热度：按 book_id 聚合借阅单数（不限状态，历史借阅均计入），TopN。 */
     public List<Map<String, Object>> findHotBorrowBooks(int limit) {
         int safe = Math.min(Math.max(limit, 1), 200);

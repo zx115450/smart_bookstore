@@ -2,7 +2,7 @@ package com.zx.ai.controller;
 
 import com.zx.ai.faq.FaqEmbeddingIndexer;
 import com.zx.ai.rag.BookEmbeddingIndexer;
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,6 +26,7 @@ public class AiAdminController {
     private final ObjectProvider<BookEmbeddingIndexer> indexerProvider;
     private final ObjectProvider<FaqEmbeddingIndexer> faqIndexerProvider;
 
+    /** 全量重建书目向量索引；RAG 关闭时返回 enabled=false。 */
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/reindex")
     public ApiResponse<Map<String, Object>> reindexAll() {
@@ -37,6 +38,7 @@ public class AiAdminController {
         return ApiResponse.ok(Map.of("enabled", true, "indexed", total));
     }
 
+    /** 按图书 ID 重建单本书向量（上架/改文案后局部刷新）。 */
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/reindex/{bookId}")
     public ApiResponse<Map<String, Object>> reindexBook(@PathVariable Long bookId) {
@@ -48,6 +50,7 @@ public class AiAdminController {
         return ApiResponse.ok(Map.of("enabled", true, "bookId", bookId));
     }
 
+    /** 重建 FAQ 向量（与书目共用 collection，靠 metadata.type=faq 区分）。 */
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/reindex-faq")
     public ApiResponse<Map<String, Object>> reindexFaq() {

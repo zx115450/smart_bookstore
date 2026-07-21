@@ -1,6 +1,6 @@
 package com.zx.bookstore.coupon.controller;
 
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import com.zx.bookstore.catalog.dto.PageResult;
 import com.zx.bookstore.coupon.dto.CreateCouponTemplateRequest;
 import com.zx.bookstore.coupon.dto.CouponTemplateResponse;

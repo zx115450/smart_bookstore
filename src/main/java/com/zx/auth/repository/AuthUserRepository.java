@@ -45,6 +45,11 @@ public class AuthUserRepository {
         return mapper.deductBalance(userId, amount) > 0;
     }
 
+    public long countAll() {
+        Long count = mapper.selectCount(Wrappers.emptyWrapper());
+        return count == null ? 0 : count;
+    }
+
     public AuthUser save(AuthUser user) {
         LocalDateTime now = LocalDateTime.now();
         if (user.getId() == null) {

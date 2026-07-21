@@ -1,6 +1,6 @@
 package com.zx.bookstore.catalog.controller;
 
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import com.zx.bookstore.catalog.dto.BookCategoryResponse;
 import com.zx.bookstore.catalog.dto.BookResponse;
 import com.zx.bookstore.catalog.dto.BookshelfResponse;

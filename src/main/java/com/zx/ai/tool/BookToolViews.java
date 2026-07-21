@@ -5,12 +5,16 @@ import com.zx.bookstore.catalog.dto.BookResponse;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** 把书目响应压成给大模型看的瘦字段。 */
+/**
+ * 把 {@link BookResponse} 压成给大模型 / 卡片用的瘦字段 Map。
+ * 截断 description，避免 Tool 返回过长占用上下文。
+ */
 final class BookToolViews {
 
     private BookToolViews() {
     }
 
+    /** 统一字段名：id / title / author / shelfLocation / borrowStock / saleStock 等。 */
     static Map<String, Object> from(BookResponse book) {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("id", book.getId());

@@ -1,35 +1,31 @@
 package com.zx.bookstore.borrow.exception;
 
-public class BorrowException extends RuntimeException {
+import com.zx.common.exception.BusinessException;
+import com.zx.common.exception.ErrorCode;
 
-    private final int code;
+public class BorrowException extends BusinessException {
 
     public BorrowException(int code, String message) {
-        super(message);
-        this.code = code;
-    }
-
-    public int getCode() {
-        return code;
+        super(code, message);
     }
 
     public static BorrowException outOfStock() {
-        return new BorrowException(4002, "可借册数不足");
+        return new BorrowException(ErrorCode.BORROW_OUT_OF_STOCK, "可借册数不足");
     }
 
     public static BorrowException hasUnreturned() {
-        return new BorrowException(4003, "存在未还书籍，不可再借");
+        return new BorrowException(ErrorCode.BORROW_HAS_UNRETURNED, "存在未还书籍，不可再借");
     }
 
     public static BorrowException invalidStatus() {
-        return new BorrowException(4004, "借阅单状态不允许该操作");
+        return new BorrowException(ErrorCode.BORROW_INVALID_STATUS, "借阅单状态不允许该操作");
     }
 
     public static BorrowException orderNotFound() {
-        return new BorrowException(4006, "借阅单不存在");
+        return new BorrowException(ErrorCode.BORROW_ORDER_NOT_FOUND, "借阅单不存在");
     }
 
     public static BorrowException forbidden() {
-        return new BorrowException(4007, "无权操作他人借阅单");
+        return new BorrowException(ErrorCode.BORROW_FORBIDDEN, "无权操作他人借阅单");
     }
 }

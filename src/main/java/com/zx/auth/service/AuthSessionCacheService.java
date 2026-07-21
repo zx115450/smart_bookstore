@@ -149,7 +149,7 @@ public class AuthSessionCacheService {
     private AuthSessionCacheSnapshot deserialize(String raw) {
         String[] parts = raw.split(String.valueOf(SEP), -1);
         if (parts.length != 9) {
-            throw new IllegalArgumentException("invalid session cache payload");
+            throw new IllegalStateException("invalid session cache payload");
         }
         Long revokedAt = parts[5].isEmpty() ? null : Long.parseLong(parts[5]);
         return new AuthSessionCacheSnapshot(

@@ -1,6 +1,6 @@
 package com.zx.auth.controller;
 
-import com.zx.auth.dto.ApiResponse;
+import com.zx.common.dto.ApiResponse;
 import com.zx.auth.dto.LoginResponse;
 import com.zx.auth.repository.AuthUserRepository;
 import com.zx.auth.security.AuthAttributes;

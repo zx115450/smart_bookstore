@@ -238,6 +238,9 @@ public class BookRecommendService {
         }
     }
 
+    /**
+     * 将种子书压成短文本，供 SIMILAR 意图下的语义召回使用（书名 + 分类 + 简介截断）。
+     */
     private String buildSeedQuery(Long bookId) {
         if (bookId == null || bookId <= 0) {
             return null;
@@ -277,6 +280,9 @@ public class BookRecommendService {
         }
     }
 
+    /**
+     * 拼推荐理由文案，供 LLM / 前端卡片展示；按意图附加「个性化」「相似」「语义相关」等说明。
+     */
     private String buildReason(BookResponse book, int heat, String categoryName, String query,
                                 boolean usedSemantic, boolean personalized, String intent, Long seedBookId) {
         List<String> parts = new ArrayList<>();
