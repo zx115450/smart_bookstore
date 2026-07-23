@@ -1,0 +1,90 @@
+# 测试专用配置：默认运行单元测试，不连真实中间件，不调用真模型 / 真邮件
+spring:
+  application:
+    name: Factory_Test_Demo
+  # 测试不引入 Milvus，避免强连本地向量库
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration
+  # 测试不自动执行 schema 初始化；由 Testcontainers 或各自 IT 自行控制
+  sql:
+    init:
+      mode: never
+  # 禁用邮件自动配置，避免无授权码触发异常
+  mail:
+    host: localhost
+    port: 1025
+    username: test
+    password: test
+    test-connection: false
+  # 占位数据源；单元测试不启用，IT 通过 @DynamicPropertySource 注入 Testcontainers
+  datasource:
+    url: jdbc:mysql://localhost:3306/test_demo?useSSL=false
+    username: root
+    password: test
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ""
+      database: 1
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+  ai:
+    openai:
+      api-key: test-key
+      chat:
+        base-url: http://localhost:9999
+        options:
+          model: dummy
+      embedding:
+        base-url: http://localhost:9999
+        options:
+          model: dummy
+          dimensions: 1024
+
+ai:
+  enabled: true
+  chat-model: dummy
+  embedding-model: dummy
+  embedding-dimension: 1024
+  temperature: 0.3
+  max-history-turns: 2
+  rate-limit:
+    per-user-hourly: 1000
+  session:
+    ttl-minutes: 5
+  rag:
+    enabled: false
+    top-k: 8
+    similarity-threshold: 0.6
+    prewarm-on-startup: false
+
+auth:
+  jwt:
+    secret: TestSecretKeyAtLeast256BitsForHmac256Algorithm
+    access-expire-seconds: 7200
+    refresh-expire-days: 7
+    refresh-expire-days-remember: 30
+    session-absolute-expire-days: 90
+    issuer: Factory_Test_Demo
+  rate-limit:
+    send-code-per-target-seconds: 60
+    send-code-per-target-hourly: 5
+    send-code-per-ip-hourly: 10
+    login-fail-max: 5
+    login-fail-lock-minutes: 15
+  verification-code-ttl-seconds: 300
+  session-cache:
+    enabled: false
+  oauth:
+    qq:
+      app-id: test
+      app-key: test
+      redirect-uri: http://localhost:8081/api/auth/oauth/qq/callback
+      frontend-success-url: http://localhost:5173/oauth/qq/success
+      frontend-error-url: http://localhost:5173/oauth/qq/error
+      state-ttl-seconds: 600

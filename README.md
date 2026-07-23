@@ -281,18 +281,24 @@ AI 客服通过 System Prompt 强制约束大模型：涉及事实的查询必�
 
 ## 测试
 
-项目测试代码位于 `src/test/java`。当前测试覆盖较少，建议后续补充：
+项目测试代码位于 `src/test/java`。当前测试覆盖较少，建议按 **[测试板块分步实现指南](docs/测试板块分步实现指南.md)**（T0～T6）逐步补齐，例如：
 
-- AI 工具调用与提示词效果测试。
-- 认证登录、Token 刷新、OAuth 流程测试。
-- 书城借阅、订单、秒杀并发测试。
-- 预约座位乐观锁冲突测试。
-- 使用 Testcontainers 进行 MySQL / Redis / RabbitMQ 集成测试。
+- AI 工具调用与提示词效果测试（CI 内 Mock，不调真模型）
+- 认证登录、Token 刷新、OAuth 流程测试
+- 书城借阅、订单、秒杀并发测试
+- 预约座位乐观锁冲突测试
+- 使用 Testcontainers 进行 MySQL / Redis / RabbitMQ 集成测试
 
 运行测试：
 
 ```bash
 mvn test
+```
+
+仅跑单元测试（排除 `*IT`）示例：
+
+```bash
+mvn -Dtest='!*IT' test
 ```
 
 ---

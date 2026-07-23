@@ -1,0 +1,14 @@
+[Unit]
+Description=Start Milvus stack (etcd, minio, standalone) in order
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/start-milvus-stack.sh
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

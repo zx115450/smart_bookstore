@@ -20,7 +20,7 @@ import java.util.Set;
  * 召回策略（两路合并，去重）：
  * <ol>
  *   <li>同分类未借过：取用户偏好分类（按命中次数降序），在每个分类下召回可借图书，
- *       排除用户已读过的书（{@link UserReadingProfile#readBookIds}）；</li>
+ *       排除用户已读过的书（{@link UserReadingProfile#}）；</li>
  *   <li>简化共现：借过同样书的其他用户还借过什么（{@link BorrowOrderRepository#findCoBorrowedBooks}），
  *       排除用户已读过的书。</li>
  * </ol>

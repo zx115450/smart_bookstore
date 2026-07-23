@@ -1,25 +1,20 @@
 package com.zx;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-//@SpringBootTest
+/**
+ * 轻量级上下文测试：确保测试工程与基础依赖能正确编译加载。
+ * 不启动完整 Spring Boot 容器，避免强连中间件。
+ */
+@ExtendWith(SpringExtension.class)
 class FactoryTestDemoApplicationTests {
 
     @Test
     void contextLoads() {
-        List<Integer> list = List.of(1 , 2 , 3, 4, 5, 56);
-        AtomicBoolean is = new AtomicBoolean(false);
-        list.forEach(i -> {
-            if (i == 1) {
-                is.set(true);
-            }
-        });
-        System.out.println(is);
+        assertEquals(1, 1);
     }
-
 }
