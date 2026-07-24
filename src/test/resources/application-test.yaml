@@ -88,3 +88,8 @@ auth:
       frontend-success-url: http://localhost:5173/oauth/qq/success
       frontend-error-url: http://localhost:5173/oauth/qq/error
       state-ttl-seconds: 600
+
+bookstore:
+  seckill:
+    rate-limit:
+      enabled: false

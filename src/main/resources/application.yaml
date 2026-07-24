@@ -175,6 +175,16 @@ bookstore:
   trade:
     unpaid-cancel-delay-minutes: 15
     # unpaid-cancel-delay-ms: 60000  # 联调时可改为 1 分钟
+  seckill:
+    rate-limit:
+      enabled: true
+      # 活动维度：容量即短时突发上限，每秒补充速率
+      activity-capacity: 2000
+      activity-refill-per-second: 2000
+      # 用户维度：防单用户狂点
+      user-capacity: 2
+      user-refill-per-second: 1
+      key-ttl-seconds: 7200
 
 checkin:
   frontend-base-url: ${CHECKIN_FRONTEND_URL:http://localhost:5173}

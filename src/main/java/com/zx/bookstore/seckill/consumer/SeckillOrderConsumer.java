@@ -29,6 +29,7 @@ public class SeckillOrderConsumer {
                         @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
         try {
             seckillService.processSeckillOrder(message);
+
             channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             log.error("consume seckill order failed, message={} → dead letter", message, e);

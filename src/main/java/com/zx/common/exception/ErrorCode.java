@@ -120,6 +120,8 @@ public final class ErrorCode {
     public static final int SECKILL_CONFIG_ERROR = 4505;
     public static final int SECKILL_SYSTEM_BUSY = 4506;
     public static final int SECKILL_NOT_PARTICIPATED = 4507;
+    /** 秒杀入口令牌桶限流触发 */
+    public static final int SECKILL_RATE_LIMITED = 4508;
 
     // AI 客服：5001~5099
     public static final int AI_SERVICE_UNAVAILABLE = 5001;

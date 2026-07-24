@@ -45,4 +45,9 @@ public class SeckillException extends BusinessException {
     public static SeckillException notParticipated() {
         return new SeckillException(ErrorCode.SECKILL_NOT_PARTICIPATED, "尚未参与该活动");
     }
+
+    /** 入口令牌桶未领到令牌（活动或用户维度限流）。 */
+    public static SeckillException rateLimited() {
+        return new SeckillException(ErrorCode.SECKILL_RATE_LIMITED, "活动太火爆，请稍后再试");
+    }
 }

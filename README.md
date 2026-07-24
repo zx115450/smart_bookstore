@@ -16,6 +16,7 @@
 - [AI 客服模块](#ai-客服模块)
 - [测试](#测试)
 - [部署建议](#部署建议)
+- [补充文档](#补充文档)
 - [安全提示](#安全提示)
 - [许可证](#许可证)
 
@@ -319,6 +320,23 @@ mvn -Dtest='!*IT' test
 - 配置日志聚合（ELK / Loki）与监控告警（Prometheus + Grafana）。
 - 对 Redis、RabbitMQ、Milvus 使用集群或云服务实例。
 - 使用 Nginx / Gateway 做反向代理、HTTPS 终止与限流。
+
+前端独立仓库的打包、Nginx 托管与回调 URL 对齐，见 **[前端部署指南](docs/前端部署指南.md)**。
+
+---
+
+## 补充文档
+
+更多说明见 [`docs/`](docs/README.md)：
+
+| 文档 | 说明 |
+| --- | --- |
+| [项目评价](docs/项目评价.md) | 完成度评价与生产差距 |
+| [前端部署指南](docs/前端部署指南.md) | 前端打包与 Nginx 部署 |
+| [后续学习路线](docs/后续学习路线.md) | 项目结束后的学习建议 |
+| [加深方向学习路线](docs/learning/README.md) | 高并发 / 缓存 / MQ / AI 工程分册 |
+| [测试板块分步实现指南](docs/测试板块分步实现指南.md) | T0～T6 测试补齐路线 |
+| [IMPROVEMENTS.md](IMPROVEMENTS.md) | 可完善项清单（P0 / P1 / P2） |
 
 ---
 

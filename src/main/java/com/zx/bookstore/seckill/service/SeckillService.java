@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * P4 秒杀核心业务：活动管理、Redis Lua 抢券、RabbitMQ 异步发券。
  * <p>
- * 抢券路径：grab → Lua 原子扣库存 → 发 MQ → 快速返回 PROCESSING；
+ * 抢券路径：grab → 令牌桶限流 → Lua 原子扣库存 → 发 MQ → 快速返回 PROCESSING；
  * 落库路径：Consumer 消费 → seckill_order + user_coupon（obtain_way=SECKILL）。
  * 一人一单由 Redis Set + DB uk_seckill_user_activity 双重保障。
  */
@@ -36,6 +36,7 @@ public class SeckillService {
 
     private final SeckillRepository seckillRepository;
     private final SeckillRedisService seckillRedisService;
+    private final SeckillRateLimitService seckillRateLimitService;
     private final SeckillMqProducer seckillMqProducer;
     private final CouponRepository couponRepository;
     private final CouponService couponService;
@@ -147,7 +148,8 @@ public class SeckillService {
     }
 
     /**
-     * 抢券入口：幂等键重试 → Lua 原子判库存/判重复 → 发 MQ → 返回排队中。
+     * 抢券入口：幂等查询 → 令牌桶限流 → Lua 原子判库存/判重复 → 发 MQ → 返回排队中。
+     * 限流在「真正尝试占库存」之前；幂等重试已有结果时不消耗令牌。
      * Lua 成功后库存已扣，若 MQ 发送失败需回滚 Redis。
      */
     public SeckillGrabResponse grab(AuthPrincipal principal, Long activityId, SeckillGrabRequest req) {
@@ -158,7 +160,7 @@ public class SeckillService {
         SeckillActivity activity = findEnabledActivity(activityId);
         validateActivityWindow(activity);
 
-        // 同 idempotencyKey 重试：直接返回已有订单状态，不重复执行 Lua
+        // 同 idempotencyKey 重试：直接返回已有订单状态，不重复限流 / Lua
         var existingByKey = seckillRepository.findOrderByIdempotencyKey(req.getIdempotencyKey());
         if (existingByKey.isPresent()) {
             return toGrabResponse(activityId, existingByKey.get());
@@ -172,6 +174,9 @@ public class SeckillService {
             }
             throw SeckillException.alreadyParticipated();
         }
+
+        // 限流在库存 Lua 之前：未拿到令牌不占库存、不进 Set
+        seckillRateLimitService.assertAllowed(activityId, principal.userId());
 
         // Lua：0=售罄 1=成功 2=已参与
         Long luaResult = seckillRedisService.grab(activityId, principal.userId());

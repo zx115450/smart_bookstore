@@ -6,6 +6,7 @@ import com.zx.auth.config.AuthQqOAuthProperties;
 import com.zx.auth.config.AuthRateLimitProperties;
 import com.zx.bookstore.borrow.config.BookstoreBorrowOverdueProperties;
 import com.zx.bookstore.config.BookstoreCacheProperties;
+import com.zx.bookstore.seckill.config.SeckillRateLimitProperties;
 import com.zx.bookstore.trade.config.BookstoreTradeProperties;
 import com.zx.marketing.checkin.config.CheckinProperties;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         BookstoreBorrowOverdueProperties.class,
         CheckinProperties.class,
         BookstoreTradeProperties.class,
+        SeckillRateLimitProperties.class,
         AiProperties.class
 })
 public class FactoryTestDemoApplication {
