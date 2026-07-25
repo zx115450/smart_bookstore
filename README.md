@@ -208,6 +208,7 @@ curl http://localhost:8081/api/auth/login \
 - `migration-book-shelf.sql` / `migration-book-stock-log.sql`：书架与库存流水升级。
 - `migration-checkin.sql`：签到与连续签到。
 - `migration-seckill.sql`：秒杀活动。
+- `migration-trade-timeout-fail.sql`：购书超时关单 DLQ 失败落库。
 
 > 生产环境建议引入 Flyway 或 Liquibase 做版本化管理，避免手工执行 SQL。
 

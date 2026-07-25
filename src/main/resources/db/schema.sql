@@ -545,6 +545,18 @@ CREATE TABLE IF NOT EXISTS trade_order_item (
   KEY idx_trade_item_order (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='购书订单明细';
 
+CREATE TABLE IF NOT EXISTS trade_order_timeout_fail (
+  id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  order_id     BIGINT UNSIGNED NULL COMMENT '订单 id，消息残缺时可为 NULL',
+  order_no     VARCHAR(32) NULL,
+  fail_reason  VARCHAR(512) NOT NULL COMMENT 'DLQ 关单失败原因',
+  status       VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING=待补偿 RESOLVED=已处理',
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_timeout_fail_status (status),
+  KEY idx_timeout_fail_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='购书超时关单 DLQ 失败落库';
+
 -- 使用说明：将本文件放在资源目录并在 DB 管理工具中执行，或由 CI/CD 在初始化阶段运行。
 --
 -- 已有库升级（座位粒度，按需手动执行）：
