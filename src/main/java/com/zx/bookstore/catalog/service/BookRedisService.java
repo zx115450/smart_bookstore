@@ -27,6 +27,7 @@ public class BookRedisService {
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final BookstoreCacheProperties cacheProperties;
+    private final BookHotKeyService hotKeyService;
 
     public Optional<BookResponse> get(Long bookId) {
         if (bookId == null || !cacheProperties.isEnabled()) {
@@ -50,7 +51,8 @@ public class BookRedisService {
         }
         try {
             String json = objectMapper.writeValueAsString(response);
-            redis.opsForValue().set(key(response.getId()), json, ttlWithJitter());
+            Duration ttl = resolveTtl(response.getId());
+            redis.opsForValue().set(key(response.getId()), json, ttl);
         } catch (JsonProcessingException e) {
             log.warn("write book cache failed, id={}, err={}", response.getId(), e.getMessage());
         }
@@ -63,9 +65,20 @@ public class BookRedisService {
         redis.delete(key(bookId));
     }
 
-    private Duration ttlWithJitter() {
-        long base = Math.max(1, cacheProperties.getDetailTtlSeconds());
-        long jitter = Math.max(0, cacheProperties.getDetailTtlJitterSeconds());
+    private Duration resolveTtl(Long bookId) {
+        if (hotKeyService != null && hotKeyService.isHot(bookId)) {
+            return ttlWithJitter(
+                    cacheProperties.getHotDetailTtlSeconds(),
+                    cacheProperties.getHotDetailTtlJitterSeconds());
+        }
+        return ttlWithJitter(
+                cacheProperties.getDetailTtlSeconds(),
+                cacheProperties.getDetailTtlJitterSeconds());
+    }
+
+    private Duration ttlWithJitter(long baseSeconds, long jitterSeconds) {
+        long base = Math.max(1, baseSeconds);
+        long jitter = Math.max(0, jitterSeconds);
         long ttl = base + (jitter > 0 ? ThreadLocalRandom.current().nextLong(0, jitter) : 0);
         return Duration.ofSeconds(ttl);
     }

@@ -5,7 +5,7 @@ package com.zx.bookstore.catalog.support;
  * 计算 Redis Bitmap 位数组长度 {@code m} 与哈希函数个数 {@code k}。
  * <p>
  * 经典公式：{@code m = -n·ln(p) / (ln2)²}，{@code k = (m/n)·ln2}。
- * 详见 {@code docs/Redis布隆过滤器Bitmap实现原理.md}。
+ * 详见 {@code docs/learning/布隆过滤器.md}。
  */
 public final class BloomFilterSpec {
 

@@ -7,6 +7,7 @@ import com.zx.bookstore.catalog.entity.Bookshelf;
 import com.zx.bookstore.catalog.repository.BookCategoryRepository;
 import com.zx.bookstore.catalog.repository.BookRepository;
 import com.zx.bookstore.catalog.repository.BookshelfRepository;
+import com.zx.bookstore.catalog.metrics.BookCacheMetrics;
 import com.zx.bookstore.catalog.support.ShelfLocationSupport;
 import com.zx.bookstore.exception.BookstoreException;
 import lombok.RequiredArgsConstructor;
@@ -28,10 +29,15 @@ public class BookCatalogService {
     private final BookRepository bookRepository;
     private final BookCategoryRepository categoryRepository;
     private final BookshelfRepository bookshelfRepository;
-    private final BookRedisService bookRedisService;
+    /** 详情二级缓存：L1 Caffeine + L2 Redis。 */
+    private final BookCacheFacade bookCacheFacade;
     private final BookStockLogService bookStockLogService;
     /** 布隆过滤器：用户详情读路径防缓存穿透（管理端详情不走布隆）。 */
     private final BookBloomRedisService bookBloomRedisService;
+    /** 热点探测：统计高访问 bookId 并加长 Redis TTL。 */
+    private final BookHotKeyService bookHotKeyService;
+    /** 缓存读路径业务指标：经 Actuator 暴露给 Prometheus。 */
+    private final BookCacheMetrics bookCacheMetrics;
 
     public PageResult<BookResponse> listBooks(Long categoryId, String keyword, long page, long size) {
         List<Book> books = bookRepository.pageEnabled(categoryId, keyword, page, size);
@@ -45,17 +51,42 @@ public class BookCatalogService {
     }
 
     public BookResponse getBookDetail(Long id) {
-        // 布隆说不存在 → 直接 404，不打 Redis 详情缓存、不打 MySQL
+        bookCacheMetrics.onRequest();
+
+        // 布隆说不存在 → 直接 404，不打 L1/L2、不打 MySQL
         if (!bookBloomRedisService.mightContain(id)) {
+            bookCacheMetrics.onBloomReject();
             throw BookstoreException.bookNotFound();
         }
-        Optional<BookResponse> cached = bookRedisService.get(id);
-        if (cached.isPresent()) {
-            log.debug("book detail cache hit, id={}", id);
-            return cached.get();
+        Optional<BookResponse> local = bookCacheFacade.getLocal(id);
+        if (local.isPresent()) {
+            log.debug("book detail L1 cache hit, id={}", id);
+            bookCacheMetrics.onL1Hit();
+            bookHotKeyService.recordAccess(id);
+            return local.get();
         }
-        Book book = bookRepository.findEnabledById(id)
-                .orElseThrow(BookstoreException::bookNotFound);
+        Optional<BookResponse> redis = bookCacheFacade.getRedis(id);
+        if (redis.isPresent()) {
+            log.debug("book detail L2 cache hit, id={}", id);
+            bookCacheFacade.fillLocal(redis.get());
+            bookCacheMetrics.onL2Hit();
+            bookHotKeyService.recordAccess(id);
+            return redis.get();
+        }
+
+        Optional<Book> bookOpt = bookRepository.findEnabledById(id);
+        if (bookOpt.isEmpty()) {
+            bookCacheMetrics.onBloomFalsePositive();
+            throw BookstoreException.bookNotFound();
+        }
+
+        BookResponse response = loadAndCacheBook(bookOpt.get(), id);
+        bookCacheMetrics.onMiss();
+        bookHotKeyService.recordAccess(id);
+        return response;
+    }
+
+    private BookResponse loadAndCacheBook(Book book, Long id) {
         String categoryName = categoryRepository.findById(book.getCategoryId())
                 .map(BookCategory::getName)
                 .orElse(null);
@@ -63,7 +94,7 @@ public class BookCatalogService {
                 ? null
                 : bookshelfRepository.findById(book.getBookshelfId()).orElse(null);
         BookResponse response = toResponse(book, categoryName, bookshelf);
-        bookRedisService.put(response);
+        bookCacheFacade.put(response);
         return response;
     }
 
@@ -170,7 +201,7 @@ public class BookCatalogService {
         validateBorrowShelfLocation(book);
         bookRepository.save(book);
         recordAdminStockAdjust(id, oldSaleStock, book.getSaleStock(), oldBorrowStock, book.getBorrowStock(), operatorId);
-        bookRedisService.evict(id);
+        bookCacheFacade.evict(id);
         String categoryName = categoryRepository.findById(book.getCategoryId())
                 .map(BookCategory::getName)
                 .orElse(null);
@@ -185,11 +216,11 @@ public class BookCatalogService {
         Book book = bookRepository.findById(id)
                 .orElseThrow(BookstoreException::bookNotFound);
         if (book.getStatus() != null && book.getStatus() == 0) {
-            bookRedisService.evict(id);
+            bookCacheFacade.evict(id);
             return;
         }
         bookRepository.updateStatus(id, 0);
-        bookRedisService.evict(id);
+        bookCacheFacade.evict(id);
     }
 
     @Transactional

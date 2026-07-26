@@ -161,6 +161,18 @@ auth:
 bookstore:
   cache:
     enabled: true
+    # L1 Caffeine（本机堆）；关闭后仅 Redis L2
+    local-enabled: true
+    local-max-size: 2000
+    local-expire-seconds: 60
+    # 热点探测：分桶滑动窗口，命中后 Redis 用长 TTL
+    hot-key-enabled: true
+    hot-window-seconds: 60
+    hot-bucket-seconds: 10
+    hot-threshold: 50
+    hot-detail-ttl-seconds: 7200
+    hot-detail-ttl-jitter-seconds: 600
+    hot-max-tracked-keys: 5000
     detail-ttl-seconds: 1800
     detail-ttl-jitter-seconds: 300
     bloom-enabled: true
