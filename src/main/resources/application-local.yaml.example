@@ -1,11 +1,22 @@
-# 本地敏感配置模板
-# 使用方法：复制本文件为 application-local.yaml，再填入真实账号密码
+# 本地敏感配置模板（已加入 .gitignore 的正式文件名：application-local.yaml）
+#
+# 使用方法：
+#   cp src/main/resources/application-local.yaml.example src/main/resources/application-local.yaml
+# 启动时激活 local profile：
+#   mvn spring-boot:run -Dspring-boot.run.profiles=local
+#   或 IDEA Active profiles = local
+#
+# 也可用同名环境变量覆盖（见下方注释中的变量名）。
 
 spring:
   mail:
+    host: smtp.qq.com
+    port: 465
+    # MAIL_USERNAME / MAIL_PASSWORD
     username: your-email@qq.com
     password: your-smtp-authorization-code
   datasource:
+    # DB_URL / DB_USERNAME / DB_PASSWORD
     url: jdbc:mysql://localhost:3306/test_demo?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&allowMultiQueries=true&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048
     username: root
     password: your-db-password
@@ -13,11 +24,31 @@ spring:
     redis:
       host: localhost
       port: 6379
+      # REDIS_PASSWORD；无密码留空
       password:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    # RABBITMQ_USERNAME / RABBITMQ_PASSWORD
+    username: guest
+    password: guest
+    virtual-host: /
+  ai:
+    openai:
+      chat:
+        # 或环境变量 DEEPSEEK_API_KEY
+        api-key: your-deepseek-api-key
+      embedding:
+        # 或环境变量 DASHSCOPE_API_KEY
+        api-key: your-dashscope-api-key
 
 auth:
+  jwt:
+    # JWT_SECRET：至少 32 字节随机串，生产必须更换
+    secret: LocalDevOnlyChangeMeUseALongRandomSecretKey32B+
   oauth:
     qq:
+      # QQ_APP_ID / QQ_APP_KEY；不用 QQ 登录可留占位
       app-id: your-qq-app-id
       app-key: your-qq-app-key
       redirect-uri: http://localhost:8081/api/auth/oauth/qq/callback

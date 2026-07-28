@@ -136,10 +136,15 @@ cp src/main/resources/application-local.yaml.example src/main/resources/applicat
 
 编辑 `src/main/resources/application-local.yaml`，填入：
 
-- 邮箱 SMTP 账号与授权码（用于发送验证码）。
-- MySQL 连接地址与密码。
-- Redis 密码（如无密码留空）。
-- QQ OAuth 的 `app-id` 与 `app-key`（仅使用 QQ 登录时需要）。
+- 邮箱 SMTP 账号与授权码（用于发送验证码）
+- MySQL 连接 URL、用户名与密码
+- Redis 密码（如无密码留空）
+- RabbitMQ 用户名与密码
+- JWT Secret（本地开发可用长随机串，生产必须更换）
+- QQ OAuth 的 `app-id` 与 `app-key`（仅使用 QQ 登录时需要）
+- DeepSeek / 通义 API Key（也可只设环境变量 `DEEPSEEK_API_KEY` / `DASHSCOPE_API_KEY`）
+
+> `application.yaml` 中敏感项已改为空占位 + 环境变量；不激活 `local` 且未注入环境变量时，数据源 / 邮件 / JWT 将无法正常工作。
 
 ### 3. 初始化数据库
 
@@ -189,11 +194,11 @@ curl http://localhost:8081/api/auth/login \
 
 ### `application-local.yaml`（本地私有配置）
 
-用于覆盖敏感信息，已加入 `.gitignore`，不会提交到版本库。请根据 `application-local.yaml.example` 创建。
+用于覆盖敏感信息，已加入 `.gitignore`，不会提交到版本库。请根据 `application-local.yaml.example` 创建，并激活 `local` profile。
 
-### `application-param.yaml`
+应覆盖的典型项：邮件账号密码、数据源、Redis/RabbitMQ 密码、JWT Secret、QQ OAuth、AI API Key。
 
-可选的外部配置文件，通过 `spring.config.import` 引入，可用于 CI/CD 或服务器环境注入密钥。
+CI / 服务器环境请用环境变量（如 `DB_PASSWORD`、`JWT_SECRET`、`DEEPSEEK_API_KEY`）注入，不再使用 `application-param.yaml`。
 
 ---
 
@@ -337,17 +342,18 @@ mvn -Dtest='!*IT' test
 | [后续学习路线](docs/后续学习路线.md) | 项目结束后的学习建议 |
 | [加深方向学习路线](docs/learning/README.md) | 高并发 / 缓存 / MQ / AI 工程分册 |
 | [测试板块分步实现指南](docs/测试板块分步实现指南.md) | T0～T6 测试补齐路线 |
+| [Flyway 落地指南](docs/Flyway落地指南.md) | 数据库版本化迁移接入步骤 |
 | [IMPROVEMENTS.md](IMPROVEMENTS.md) | 可完善项清单（P0 / P1 / P2） |
 
 ---
 
 ## 安全提示
 
-1. **JWT Secret**：生产环境必须替换 `auth.jwt.secret`，建议使用 256 位随机字符串并通过环境变量注入。
-2. **数据库密码**：不要提交明文密码到版本库，使用 `application-local.yaml` 或环境变量。
+1. **JWT Secret**：生产环境必须通过环境变量 `JWT_SECRET` 或密钥服务注入，禁止使用仓库内默认值；本地写在 `application-local.yaml`。
+2. **数据库 / 邮件 / MQ 密码**：不要提交明文到版本库，使用 `application-local.yaml` 或环境变量。
 3. **验证码**：开发环境示例验证码可能固定或打印在日志中，生产环境必须接入真实短信/邮件通道。
 4. **QQ OAuth**：回调地址需与 QQ 互联平台配置一致，避免被伪造回调攻击。
-5. **AI API Key**：通过环境变量 `DEEPSEEK_API_KEY` / `DASHSCOPE_API_KEY` 注入，禁止写入配置文件。
+5. **AI API Key**：通过环境变量 `DEEPSEEK_API_KEY` / `DASHSCOPE_API_KEY` 或 `application-local.yaml` 注入，禁止写入已提交的 `application.yaml`。
 
 ---
 

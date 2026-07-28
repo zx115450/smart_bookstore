@@ -17,26 +17,19 @@
 ### 1. 敏感信息与默认密钥清理
 
 **问题**：
-`application.yaml` 中仍包含明文凭据和默认密钥：
+`application.yaml` 中曾包含明文凭据和默认密钥（邮件、数据库、JWT 等）。
 
-- 邮箱 SMTP 密码：`spring.mail.password`（`application.yaml:21`）
-- 数据库密码：`spring.datasource.password`（`application.yaml:39`）
-- JWT 默认 Secret：`auth.jwt.secret`（`application.yaml:136`）
+**状态**：敏感项已抽离为环境变量占位；本地通过 `application-local.yaml`（gitignore）+ `spring.profiles.active=local` 注入。模板见 `application-local.yaml.example`。
 
-**影响**：
-一旦提交到版本库或打包部署，密钥会泄露；默认 JWT Secret 可被直接用于伪造 Token。
+**仍须注意**：
 
-**建议**：
-
-1. 将 `application.yaml` 中的敏感字段全部改为占位符或外部变量，例如 `${DB_PASSWORD}`、`${JWT_SECRET}`。
-2. 生产环境强制通过环境变量或密钥管理服务注入。
-3. 在 README 中明确标注「必须替换默认密钥」。
+1. 生产环境强制通过环境变量或密钥管理服务注入，禁止把真实密钥写回 `application.yaml`。
+2. 若密钥曾提交到 Git 历史，应轮换 SMTP / JWT / 数据库密码。
+3. 启动必须带 `local` profile，或自行注入 `DB_*` / `MAIL_*` / `JWT_SECRET` 等变量。
 
 **参考**：
 
-- `src/main/resources/application.yaml:21`
-- `src/main/resources/application.yaml:39`
-- `src/main/resources/application.yaml:136`
+- `src/main/resources/application.yaml`
 - `src/main/resources/application-local.yaml.example`
 
 ---
@@ -151,14 +144,16 @@ void contextLoads() {
 
 1. 引入 **Flyway** 或 **Liquibase**。
 2. 将现有 `schema.sql` 迁移为 `V1__init_schema.sql`。
-3. 将各 `migration-*.sql` 按功能整理为 `V2__*`、`V3__*`。
+3. 将各 `migration-*.sql` 按功能整理为 `V2__*`、`V3__*`（或归档后只保留 V1 基线，后续增量新开版本）。
 4. 生产环境关闭 `spring.sql.init.mode` 或设为 `never`。
+
+**落地文档**：[docs/Flyway落地指南.md](docs/Flyway落地指南.md)（推荐策略 A：当前 schema 作 V1 + 旧脚本归档）。
 
 **参考**：
 
 - `src/main/resources/db/schema.sql`
 - `src/main/resources/db/migration-*.sql`
-- `src/main/resources/application.yaml:13`
+- `src/main/resources/application.yaml`（`spring.sql.init`）
 
 ---
 

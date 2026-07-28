@@ -8,19 +8,18 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration
-  config:
-    # 本地密钥（已 gitignore）；也可用环境变量 DEEPSEEK_API_KEY / DASHSCOPE_API_KEY
-    import: optional:classpath:application-param.yaml
+  # 敏感配置：激活 local profile → application-local.yaml（已 gitignore）
   sql:
     init:
       mode: always
       schema-locations: classpath:db/schema.sql
       continue-on-error: false
   mail:
-    host: smtp.qq.com
-    port: 465
-    username: 3498387581@qq.com
-    password: xsxcpvehijsadbdf
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:465}
+    # 敏感：在 application-local.yaml 或环境变量中覆盖
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     protocol: smtp
     ssl:
       enabled: true
@@ -30,15 +29,16 @@ spring:
           auth: true
           ssl:
             enable: true
-            trust: smtp.qq.com
+            trust: ${MAIL_SSL_TRUST:smtp.qq.com}
           from: ${spring.mail.username}
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
   datasource:
-    url: jdbc:mysql://localhost:3306/test_demo?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&allowMultiQueries=true&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048
-    username: root
-    password: 1234
+    # 敏感：url / username / password 在 application-local.yaml 覆盖
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       pool-name: FactoryTestDemoHikariCP
@@ -61,8 +61,9 @@ spring:
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:itheima}
-    password: ${RABBITMQ_PASSWORD:1234}
+    # 敏感：账号密码在 application-local.yaml 覆盖
+    username: ${RABBITMQ_USERNAME:}
+    password: ${RABBITMQ_PASSWORD:}
     virtual-host: ${RABBITMQ_VHOST:/}
     listener:
       simple:
@@ -75,12 +76,14 @@ spring:
       embedding: openai
     openai:
       chat:
+        # 敏感：DEEPSEEK_API_KEY 或 application-local.yaml
         api-key: ${DEEPSEEK_API_KEY:${AI_API_KEY:}}
         base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
         options:
           model: ${ai.chat-model}
           temperature: ${ai.temperature}
       embedding:
+        # 敏感：DASHSCOPE_API_KEY 或 application-local.yaml
         api-key: ${DASHSCOPE_API_KEY:${AI_EMBEDDING_API_KEY:}}
         # Spring AI 会自动拼接 /v1 → .../compatible-mode/v1
         base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
@@ -134,7 +137,8 @@ mybatis-plus:
 
 auth:
   jwt:
-    secret: ${JWT_SECRET:FactoryTestDemoChangeMeInProductionUse256BitKey123456}
+    # 敏感：必须在 application-local.yaml 或 JWT_SECRET 中提供（≥256 bit 随机串）
+    secret: ${JWT_SECRET:}
     access-expire-seconds: 7200
     refresh-expire-days: 7
     refresh-expire-days-remember: 30
