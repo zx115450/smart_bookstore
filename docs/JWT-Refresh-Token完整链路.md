@@ -1,4 +1,9 @@
 # JWT / Refresh Token 完整链路
+
+> **项目**：smart_bookstore（智慧书城） · **文档类型**：学习文档  
+> **关联**：`com.zx.auth` — 双 Token 端到端链路，配合双 Token 学习文档  
+> **索引**：[学习文档中心](./README.md)
+
 ## 一、为什么需要双 Token
 
 纯 Session（服务端存会话、Cookie 带 SessionId）在前后端分离场景下会遇到：
@@ -395,7 +400,7 @@ auth:
     access-expire-seconds: 7200      # 2h
     refresh-expire-days: 7
     refresh-expire-days-remember: 30
-    issuer: Factory_Test_Demo
+    issuer: smart_bookstore
 ```
 
 4. 替换 `createSessionAndResponse` 中的 `"access:" + UUID` 为 `jwtService.createAccessToken(...)`。
@@ -561,7 +566,7 @@ sequenceDiagram
 
 - [接口文档](./接口文档.md) — 登录、刷新接口请求/响应细节  
 - [前后端联调文档](./前后端联调文档.md) — 前端环境配置与返回字段  
-- [工厂模式实战博客](./工厂模式实战博客.md) — 多登录方式与认证架构  
+- [工厂模式学习文档](./工厂模式学习文档.md) — 多登录方式与认证架构  
 - [大二项目规划指南](./大二项目规划指南.md) — JWT 作为项目深化方向  
 
 ---

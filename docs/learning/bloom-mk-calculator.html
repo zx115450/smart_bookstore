@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>布隆过滤器参数：m / k 交互演算</title>
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --paper: #fffdf8;
+      --ink: #1a1f1c;
+      --muted: #5c6560;
+      --line: #d4cdc0;
+      --accent: #0f6b5c;
+      --accent-soft: #d8ebe6;
+      --warn: #8a4b12;
+      --chart-m: #0f6b5c;
+      --chart-k: #2c4a7c;
+      --font-display: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --font-mono: "Cascadia Code", "Consolas", "SF Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font-display);
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse 80% 50% at 10% -10%, #e8f2ef 0%, transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 0%, #efe8d8 0%, transparent 50%),
+        var(--bg);
+      line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+
+    header h1 {
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.45rem, 3vw, 1.9rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    header p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 42rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    @media (min-width: 800px) {
+      .grid-main { grid-template-columns: 1.05fr 0.95fr; }
+    }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 1.1rem 1.2rem;
+    }
+    .card h2 {
+      margin: 0 0 0.85rem;
+      font-size: 0.95rem;
+      font-weight: 650;
+      text-transform: none;
+      color: var(--ink);
+    }
+
+    .formula {
+      font-family: var(--font-mono);
+      font-size: 0.92rem;
+      background: var(--accent-soft);
+      border-radius: 8px;
+      padding: 0.75rem 0.9rem;
+      margin-bottom: 0.65rem;
+      overflow-x: auto;
+    }
+    .formula .live { color: var(--accent); font-weight: 600; }
+
+    label.ctrl {
+      display: block;
+      margin-bottom: 1.1rem;
+    }
+    label.ctrl:last-child { margin-bottom: 0; }
+    .ctrl-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin-bottom: 0.35rem;
+      font-size: 0.9rem;
+    }
+    .ctrl-top span.name { color: var(--muted); }
+    .ctrl-top span.val {
+      font-family: var(--font-mono);
+      font-weight: 650;
+      color: var(--accent);
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .hint {
+      margin-top: 0.25rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.65rem;
+    }
+    @media (min-width: 520px) {
+      .metrics { grid-template-columns: repeat(4, 1fr); }
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.7rem 0.75rem;
+      background: #fff;
+    }
+    .metric .lbl {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .metric .num {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-top: 0.15rem;
+      color: var(--ink);
+    }
+    .metric .sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+    .metric.cap .num { color: var(--warn); }
+
+    .chart-wrap { position: relative; height: 260px; }
+    canvas { width: 100%; height: 100%; display: block; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 0.6rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .legend i {
+      display: inline-block;
+      width: 12px;
+      height: 3px;
+      vertical-align: middle;
+      margin-right: 0.35rem;
+      border-radius: 1px;
+    }
+    .legend .m { background: var(--chart-m); }
+    .legend .k { background: var(--chart-k); }
+
+    .note {
+      margin-top: 1rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .note code {
+      font-family: var(--font-mono);
+      font-size: 0.8em;
+      background: #eee9df;
+      padding: 0.05em 0.35em;
+      border-radius: 3px;
+    }
+
+    footer {
+      margin-top: 1.25rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>布隆过滤器：m / k 交互演算</h1>
+      <p>
+        拖动预期元素数 <strong>n</strong> 与目标假阳性率 <strong>p</strong>，
+        实时计算位图长度 <strong>m</strong>、哈希个数 <strong>k</strong> 与粗算内存。
+        与仓库 <code>BloomFilterSpec.of</code> 一致（m ≥ 64，k ∈ [1, 16]）。
+      </p>
+    </header>
+
+    <div class="grid grid-main">
+      <section class="card">
+        <h2>输入参数</h2>
+        <label class="ctrl">
+          <div class="ctrl-top">
+            <span class="name">n · 预期插入元素数</span>
+            <span class="val" id="nLabel">100000</span>
+          </div>
+          <input id="n" type="range" min="1000" max="1000000" step="1000" value="100000" />
+          <div class="hint">范围 1,000 ～ 1,000,000（本仓库默认 100,000）</div>
+        </label>
+        <label class="ctrl">
+          <div class="ctrl-top">
+            <span class="name">p · 目标假阳性率</span>
+            <span class="val" id="pLabel">0.01 (1%)</span>
+          </div>
+          <input id="p" type="range" min="1" max="200" step="1" value="10" />
+          <div class="hint">滑块 = p × 1000，即 0.001 ～ 0.200（默认 0.01）</div>
+        </label>
+
+        <h2 style="margin-top:1.25rem">公式（代入当前值）</h2>
+        <div class="formula" id="formulaM">
+          m = ⌈ −n·ln(p) / (ln 2)² ⌉
+        </div>
+        <div class="formula" id="formulaK">
+          k = round( (m/n)·ln 2 )
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>计算结果</h2>
+        <div class="metrics">
+          <div class="metric">
+            <div class="lbl">m（bit）</div>
+            <div class="num" id="mOut">—</div>
+            <div class="sub">位数组长度</div>
+          </div>
+          <div class="metric" id="kCard">
+            <div class="lbl">k</div>
+            <div class="num" id="kOut">—</div>
+            <div class="sub">哈希函数个数</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">内存粗算</div>
+            <div class="num" id="memOut">—</div>
+            <div class="sub">⌈m/8⌉ bytes</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">bits / 元素</div>
+            <div class="num" id="bpeOut">—</div>
+            <div class="sub">m / n</div>
+          </div>
+        </div>
+        <p class="note" id="capNote"></p>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:1rem">
+      <h2>曲线：固定当前 n，横轴为 p，纵轴为 m（左）与 k（右）</h2>
+      <div class="chart-wrap">
+        <canvas id="chart" width="900" height="260"></canvas>
+      </div>
+      <div class="legend">
+        <span><i class="m"></i>m（左轴，bit）</span>
+        <span><i class="k"></i>k（右轴，裁剪前）</span>
+        <span>竖线 = 当前选定的 p</span>
+      </div>
+      <p class="note">
+        直观：<strong>p 越小 → m 越大</strong>；<strong>n 越大 → m 越大</strong>。
+        k 过大收益递减，本仓库将 k 限制在 <code>[1, 16]</code>。
+      </p>
+    </section>
+
+    <footer>
+      对应文档：docs/learning/布隆过滤器.md §3.2 · 本地用浏览器直接打开本文件即可。
+    </footer>
+  </div>
+
+  <script>
+    const LN2 = Math.LOG2E; // 1/ln(2) 不直接用；用 Math.log(2)
+    const ln2 = Math.log(2);
+
+    function compute(n, p) {
+      const mRaw = Math.ceil((-n * Math.log(p)) / (ln2 * ln2));
+      const m = Math.max(mRaw, 64);
+      const kRaw = Math.round((m / n) * ln2);
+      const k = Math.max(1, Math.min(kRaw, 16));
+      const bytes = Math.ceil(m / 8);
+      return { mRaw, m, kRaw, k, bytes, capped: k !== kRaw || m !== mRaw };
+    }
+
+    function formatInt(x) {
+      return x.toLocaleString("en-US");
+    }
+
+    function formatBytes(b) {
+      if (b < 1024) return b + " B";
+      if (b < 1024 * 1024) return (b / 1024).toFixed(1) + " KB";
+      return (b / (1024 * 1024)).toFixed(2) + " MB";
+    }
+
+    function formatP(p) {
+      const pct = (p * 100).toFixed(p < 0.01 ? 2 : 1);
+      return p.toFixed(3) + " (" + pct + "%)";
+    }
+
+    const nEl = document.getElementById("n");
+    const pEl = document.getElementById("p");
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+
+    function readInputs() {
+      const n = Number(nEl.value);
+      const p = Number(pEl.value) / 1000;
+      return { n, p };
+    }
+
+    function update() {
+      const { n, p } = readInputs();
+      const r = compute(n, p);
+
+      document.getElementById("nLabel").textContent = formatInt(n);
+      document.getElementById("pLabel").textContent = formatP(p);
+
+      document.getElementById("formulaM").innerHTML =
+        "m = ⌈ −<span class=\"live\">" + formatInt(n) + "</span>·ln(<span class=\"live\">" +
+        p.toFixed(3) + "</span>) / (ln 2)² ⌉ = <span class=\"live\">" + formatInt(r.m) + "</span>";
+
+      document.getElementById("formulaK").innerHTML =
+        "k = round( (<span class=\"live\">" + formatInt(r.m) + "</span>/<span class=\"live\">" +
+        formatInt(n) + "</span>)·ln 2 ) → raw <span class=\"live\">" + r.kRaw +
+        "</span> → clamp <span class=\"live\">" + r.k + "</span>";
+
+      document.getElementById("mOut").textContent = formatInt(r.m);
+      document.getElementById("kOut").textContent = String(r.k);
+      document.getElementById("memOut").textContent = formatBytes(r.bytes);
+      document.getElementById("bpeOut").textContent = (r.m / n).toFixed(2);
+
+      const kCard = document.getElementById("kCard");
+      const capNote = document.getElementById("capNote");
+      if (r.k !== r.kRaw) {
+        kCard.classList.add("cap");
+        capNote.textContent =
+          "注意：理论 k = " + r.kRaw + "，已按 BloomFilterSpec 裁剪到 [1, 16]，当前 k = " + r.k + "。";
+      } else {
+        kCard.classList.remove("cap");
+        capNote.textContent =
+          "与本仓库一致：m = max(ceil(...), 64)，k = clamp(round(...), 1, 16)。粗算内存不含 Redis 对象头。";
+      }
+
+      drawChart(n, p);
+    }
+
+    function drawChart(nFixed, pCurrent) {
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = canvas.clientWidth;
+      const cssH = canvas.clientHeight;
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const W = cssW;
+      const H = cssH;
+      const pad = { l: 58, r: 48, t: 16, b: 36 };
+      const plotW = W - pad.l - pad.r;
+      const plotH = H - pad.t - pad.b;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // p from 0.001 to 0.2
+      const pMin = 0.001;
+      const pMax = 0.2;
+      const samples = 80;
+      const pts = [];
+      let mMax = 1;
+      let kMax = 1;
+      for (let i = 0; i <= samples; i++) {
+        const t = i / samples;
+        const p = pMin * Math.pow(pMax / pMin, t); // log scale
+        const r = compute(nFixed, p);
+        pts.push({ p, m: r.m, k: r.kRaw });
+        mMax = Math.max(mMax, r.m);
+        kMax = Math.max(kMax, r.kRaw);
+      }
+      kMax = Math.max(kMax, 16);
+
+      const xOf = (p) => {
+        const t = Math.log(p / pMin) / Math.log(pMax / pMin);
+        return pad.l + t * plotW;
+      };
+      const yM = (m) => pad.t + plotH * (1 - m / mMax);
+      const yK = (k) => pad.t + plotH * (1 - k / kMax);
+
+      // grid
+      ctx.strokeStyle = "#e4ddd0";
+      ctx.lineWidth = 1;
+      for (let g = 0; g <= 4; g++) {
+        const y = pad.t + (plotH * g) / 4;
+        ctx.beginPath();
+        ctx.moveTo(pad.l, y);
+        ctx.lineTo(pad.l + plotW, y);
+        ctx.stroke();
+      }
+
+      // axes
+      ctx.strokeStyle = "#8a8378";
+      ctx.beginPath();
+      ctx.moveTo(pad.l, pad.t);
+      ctx.lineTo(pad.l, pad.t + plotH);
+      ctx.lineTo(pad.l + plotW, pad.t + plotH);
+      ctx.stroke();
+
+      // m curve
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--chart-m").trim() || "#0f6b5c";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      pts.forEach((pt, i) => {
+        const x = xOf(pt.p);
+        const y = yM(pt.m);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // k curve
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--chart-k").trim() || "#2c4a7c";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      pts.forEach((pt, i) => {
+        const x = xOf(pt.p);
+        const y = yK(pt.k);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // current p marker
+      const xc = xOf(Math.min(pMax, Math.max(pMin, pCurrent)));
+      ctx.strokeStyle = "#c45c26";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(xc, pad.t);
+      ctx.lineTo(xc, pad.t + plotH);
+      ctx.stroke();
+
+      // labels
+      ctx.fillStyle = "#5c6560";
+      ctx.font = "11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("p（对数坐标）", pad.l + plotW / 2, H - 8);
+      ["0.001", "0.01", "0.05", "0.2"].forEach((label) => {
+        const pv = Number(label);
+        ctx.fillText(label, xOf(pv), pad.t + plotH + 16);
+      });
+
+      ctx.save();
+      ctx.translate(14, pad.t + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = "center";
+      ctx.fillText("m (bit)", 0, 0);
+      ctx.restore();
+
+      ctx.textAlign = "right";
+      ctx.fillText(formatInt(mMax), pad.l - 6, pad.t + 4);
+      ctx.fillText("0", pad.l - 6, pad.t + plotH);
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#2c4a7c";
+      ctx.fillText("k=" + Math.round(kMax), pad.l + plotW + 6, pad.t + 4);
+      ctx.fillText("0", pad.l + plotW + 6, pad.t + plotH);
+    }
+
+    nEl.addEventListener("input", update);
+    pEl.addEventListener("input", update);
+    window.addEventListener("resize", update);
+    update();
+  </script>
+</body>
+</html>

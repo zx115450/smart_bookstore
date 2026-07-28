@@ -1,6 +1,6 @@
 # 项目可完善内容清单
 
-本文档基于当前代码结构、配置与测试现状，整理出 Factory_Test_Demo 项目可以继续完善的方向。按优先级分为 P0（建议优先）、P1（中期）、P2（长期/体验）。每个条目包含问题描述、影响范围和推荐方案，便于逐步推进。
+本文档基于当前代码结构、配置与测试现状，整理出 smart_bookstore 项目可以继续完善的方向。按优先级分为 P0（建议优先）、P1（中期）、P2（长期/体验）。每个条目包含问题描述、影响范围和推荐方案，便于逐步推进。
 
 ---
 
@@ -40,7 +40,7 @@
 测试目录只有一个几乎为空的测试类：
 
 ```java
-// src/test/java/com/zx/FactoryTestDemoApplicationTests.java
+// src/test/java/com/zx/SmartBookstoreApplicationTests.java
 @Test
 void contextLoads() {
     List<Integer> list = List.of(1 , 2 , 3, 4, 5, 56);
@@ -65,7 +65,7 @@ void contextLoads() {
 
 **参考**：
 
-- `src/test/java/com/zx/FactoryTestDemoApplicationTests.java`
+- `src/test/java/com/zx/SmartBookstoreApplicationTests.java`
 
 ---
 
@@ -132,31 +132,15 @@ void contextLoads() {
 
 ### 5. 数据库迁移版本化管理
 
-**问题**：
+**状态**：已接入 Flyway（策略 A）。
 
-- 当前使用 `schema.sql` 做全量初始化，另有 `migration-*.sql` 散落文件。
-- 生产环境没有自动化的增量升级机制。
+- 依赖：`spring-boot-starter-flyway` + `flyway-mysql`
+- 基线：`src/main/resources/db/migration/V1__init_schema.sql`
+- `spring.sql.init.mode=never`；`baseline-on-migrate=true`（兼容已有本地库）
 
-**影响**：
-手工执行 SQL 容易出错，多人协作时难以确认数据库版本是否一致。
-
-**建议**：
-
-1. 引入 **Flyway** 或 **Liquibase**。
-2. 将现有 `schema.sql` 迁移为 `V1__init_schema.sql`。
-3. 将各 `migration-*.sql` 按功能整理为 `V2__*`、`V3__*`（或归档后只保留 V1 基线，后续增量新开版本）。
-4. 生产环境关闭 `spring.sql.init.mode` 或设为 `never`。
-
-**落地文档**：[docs/Flyway落地指南.md](docs/Flyway落地指南.md)（推荐策略 A：当前 schema 作 V1 + 旧脚本归档）。
-
-**参考**：
-
-- `src/main/resources/db/schema.sql`
-- `src/main/resources/db/migration-*.sql`
-- `src/main/resources/application.yaml`（`spring.sql.init`）
+后续表结构变更请新增 `V2__….sql`。说明见 [docs/Flyway落地指南.md](docs/Flyway落地指南.md)。
 
 ---
-
 ## P1 - 中优先级
 
 ### 6. 接入 Actuator 与可观测性
@@ -346,8 +330,8 @@ Set<String> keys = redis.keys(KEY_PREFIX + "*");
 
 **问题**：
 
-- `FactoryTestDemoApplicationTests` 中引入了未使用的 `BCryptPasswordEncoder`。
-- 主类 `FactoryTestDemoApplication` 手动 import 大量 `@EnableConfigurationProperties` 配置类，可改为在配置类上加 `@ConfigurationProperties` + `@Component` 或 `@ConfigurationPropertiesScan`。
+- `SmartBookstoreApplicationTests` 中引入了未使用的 `BCryptPasswordEncoder`。
+- 主类 `SmartBookstoreApplication` 手动 import 大量 `@EnableConfigurationProperties` 配置类，可改为在配置类上加 `@ConfigurationProperties` + `@Component` 或 `@ConfigurationPropertiesScan`。
 - 部分模块的 `ExceptionHandler` 重复捕获 `IllegalArgumentException`，可统一。
 
 **建议**：
@@ -358,8 +342,8 @@ Set<String> keys = redis.keys(KEY_PREFIX + "*");
 
 **参考**：
 
-- `src/test/java/com/zx/FactoryTestDemoApplicationTests.java:5`
-- `src/main/java/com/zx/FactoryTestDemoApplication.java:20`
+- `src/test/java/com/zx/SmartBookstoreApplicationTests.java:5`
+- `src/main/java/com/zx/SmartBookstoreApplication.java:20`
 
 ---
 

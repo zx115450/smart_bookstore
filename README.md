@@ -1,4 +1,4 @@
-# Factory Test Demo - 智慧书城
+# Smart Bookstore - 智慧书城
 
 一个基于 Spring Boot 4.1 + Spring AI 2.0 构建的「智慧书城」综合 Demo，涵盖 AI 客服、图书商城、借阅、预约、签到、秒杀、优惠券、RBAC 认证等模块。项目用于展示现代 Java 后端技术栈在书店/图书馆场景下的完整实践能力。
 
@@ -16,7 +16,7 @@
 - [AI 客服模块](#ai-客服模块)
 - [测试](#测试)
 - [部署建议](#部署建议)
-- [补充文档](#补充文档)
+- [补充文档（学习文档）](#补充文档学习文档)
 - [安全提示](#安全提示)
 - [许可证](#许可证)
 
@@ -105,8 +105,9 @@
 - MySQL 8.0+
 - Redis 6.0+
 - RabbitMQ 3.8+
-- Milvus 2.6+（仅在启用 RAG 时需要）
+- Milvus 2.5+（仅在启用 RAG 时需要）
 - Maven 3.9+
+- Docker / Docker Compose（推荐，用于一键拉起中间件）
 
 推荐前端联调地址：
 
@@ -121,12 +122,33 @@
 
 ```bash
 git clone <repository-url>
-cd Factory_Test_Demo
+cd smart_bookstore
 ```
 
 使用 IntelliJ IDEA 或 VS Code 打开项目，等待 Maven 依赖下载完成。
 
-### 2. 创建本地配置
+### 2. 一键启动中间件（Docker）
+
+```bash
+# MySQL + Redis + RabbitMQ
+docker compose up -d
+
+# 若要启用 AI RAG，额外拉起 Milvus
+docker compose --profile milvus up -d
+```
+
+默认连接信息（写入下一步的 `application-local.yaml`）：
+
+| 服务 | 地址 | 账号 |
+| --- | --- | --- |
+| MySQL | `localhost:3306` / 库 `smart_bookstore` | `root` / `root` |
+| Redis | `localhost:6379` | 无密码 |
+| RabbitMQ | `localhost:5672`（管理台 `http://localhost:15672`） | `guest` / `guest` |
+| Milvus | `localhost:19530` | — |
+
+库名已由 Compose 自动创建；表结构仍由应用启动时 Flyway 迁移。
+
+### 3. 创建本地配置
 
 复制示例文件并填入真实账号密码：
 
@@ -137,36 +159,38 @@ cp src/main/resources/application-local.yaml.example src/main/resources/applicat
 编辑 `src/main/resources/application-local.yaml`，填入：
 
 - 邮箱 SMTP 账号与授权码（用于发送验证码）
-- MySQL 连接 URL、用户名与密码
-- Redis 密码（如无密码留空）
-- RabbitMQ 用户名与密码
+- MySQL / Redis / RabbitMQ（若用 Docker，示例文件已按 `root/root`、无 Redis 密码、`guest/guest` 填好）
 - JWT Secret（本地开发可用长随机串，生产必须更换）
 - QQ OAuth 的 `app-id` 与 `app-key`（仅使用 QQ 登录时需要）
 - DeepSeek / 通义 API Key（也可只设环境变量 `DEEPSEEK_API_KEY` / `DASHSCOPE_API_KEY`）
 
 > `application.yaml` 中敏感项已改为空占位 + 环境变量；不激活 `local` 且未注入环境变量时，数据源 / 邮件 / JWT 将无法正常工作。
 
-### 3. 初始化数据库
+### 4. 初始化数据库
 
-在 MySQL 中创建数据库：
+若已用 `docker compose up -d`，库 `smart_bookstore` 已自动创建，可跳过本步。
+
+否则在 MySQL 中**只创建空库**（表结构由 Flyway 在启动时自动迁移）：
 
 ```sql
-CREATE DATABASE IF NOT EXISTS test_demo
+CREATE DATABASE IF NOT EXISTS smart_bookstore
   DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_0900_ai_ci;
 ```
 
-然后执行 `src/main/resources/db/schema.sql` 初始化表结构与示例数据。
+- 空库：启动后执行 `db/migration/V1__init_schema.sql`
+- 已有表结构的库：`baseline-on-migrate=true` 会记为版本 1，不重复建表
+- 明细见 [Flyway 落地指南](docs/Flyway落地指南.md)
 
-### 4. 启动应用
+### 5. 启动应用
 
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-或使用 IDEA 直接运行 `FactoryTestDemoApplication`，并设置 Active profiles 为 `local`。
+或使用 IDEA 直接运行 `SmartBookstoreApplication`，并设置 Active profiles 为 `local`。
 
-### 5. 验证
+### 6. 验证
 
 应用启动后访问：
 
@@ -204,18 +228,16 @@ CI / 服务器环境请用环境变量（如 `DB_PASSWORD`、`JWT_SECRET`、`DEE
 
 ## 数据库初始化
 
-所有表结构定义位于 `src/main/resources/db/schema.sql`。
+表结构由 **Flyway** 管理，脚本目录：`src/main/resources/db/migration/`。
 
-此外，项目提供了若干增量脚本，用于特定功能升级：
+| 文件 | 说明 |
+| --- | --- |
+| `V1__init_schema.sql` | 当前完整基线（含示例角色 / 图书等幂等种子） |
+| 后续 `V2__….sql` | 仅写增量变更 |
 
-- `migration-seat.sql`：座位粒度预约升级。
-- `migration-borrow.sql` / `migration-borrow-overdue.sql`：借阅相关升级。
-- `migration-book-shelf.sql` / `migration-book-stock-log.sql`：书架与库存流水升级。
-- `migration-checkin.sql`：签到与连续签到。
-- `migration-seckill.sql`：秒杀活动。
-- `migration-trade-timeout-fail.sql`：购书超时关单 DLQ 失败落库。
+历史手工脚本已废弃；当前仅使用 `db/migration/`。接入说明见 [Flyway 落地指南](docs/Flyway落地指南.md)。
 
-> 生产环境建议引入 Flyway 或 Liquibase 做版本化管理，避免手工执行 SQL。
+`spring.sql.init.mode` 已设为 `never`，勿再手跑旧 `schema.sql` 与 Flyway 混用。
 
 ---
 
@@ -321,7 +343,7 @@ mvn -Dtest='!*IT' test
 ### 生产环境
 
 - 必须外部化所有密钥（JWT Secret、数据库密码、邮箱授权码、API Key），禁止保留 `application.yaml` 中的默认值。
-- 关闭 `spring.sql.init.mode` 或改为 `never`，避免启动时重复初始化数据。
+- 确认 `spring.sql.init.mode=never`，表结构只走 Flyway。
 - 引入 `spring-boot-starter-actuator` 暴露健康检查端点。
 - 配置日志聚合（ELK / Loki）与监控告警（Prometheus + Grafana）。
 - 对 Redis、RabbitMQ、Milvus 使用集群或云服务实例。
@@ -331,18 +353,19 @@ mvn -Dtest='!*IT' test
 
 ---
 
-## 补充文档
+## 补充文档（学习文档）
 
-更多说明见 [`docs/`](docs/README.md)：
+配套学习资料见 [`docs/`](docs/README.md)（按业务域组织，每篇尽量绑定本仓库代码路径）：
 
 | 文档 | 说明 |
 | --- | --- |
-| [项目评价](docs/项目评价.md) | 完成度评价与生产差距 |
-| [前端部署指南](docs/前端部署指南.md) | 前端打包与 Nginx 部署 |
-| [后续学习路线](docs/后续学习路线.md) | 项目结束后的学习建议 |
+| [学习文档中心](docs/README.md) | 总索引与推荐学习路径 |
+| [项目介绍](docs/项目介绍.md) | 业务闭环与技术栈总览 |
+| [AI 模块学习文档](docs/AI模块学习文档.md) | AI 客服心智模型与读码顺序 |
+| [登录流程学习文档](docs/登录流程学习文档.md) | 统一登录与 Handler 工厂 |
 | [加深方向学习路线](docs/learning/README.md) | 高并发 / 缓存 / MQ / AI 工程分册 |
-| [测试板块分步实现指南](docs/测试板块分步实现指南.md) | T0～T6 测试补齐路线 |
-| [Flyway 落地指南](docs/Flyway落地指南.md) | 数据库版本化迁移接入步骤 |
+| [测试板块分步实现指南](docs/测试板块分步实现指南.md) | T0～T6 测试补齐 |
+| [Flyway 落地指南](docs/Flyway落地指南.md) | 数据库版本化迁移 |
 | [IMPROVEMENTS.md](IMPROVEMENTS.md) | 可完善项清单（P0 / P1 / P2） |
 
 ---

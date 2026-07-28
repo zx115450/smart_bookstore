@@ -39,7 +39,7 @@ class JwtServiceTest {
     @Test
     void shouldCreateAndParseAccessToken() {
         when(jwtProperties.getSecret()).thenReturn("TestSecretKeyAtLeast256BitsForHmac256Algorithm");
-        when(jwtProperties.getIssuer()).thenReturn("Factory_Test_Demo");
+        when(jwtProperties.getIssuer()).thenReturn("smart_bookstore");
         when(jwtProperties.getAccessExpireSeconds()).thenReturn(7200L);
 
         String token = jwtService.createAccessToken(1L, "user", 100L, List.of("USER"));
@@ -55,7 +55,7 @@ class JwtServiceTest {
     @Test
     void shouldThrowOnInvalidToken() {
         when(jwtProperties.getSecret()).thenReturn("TestSecretKeyAtLeast256BitsForHmac256Algorithm");
-        when(jwtProperties.getIssuer()).thenReturn("Factory_Test_Demo");
+        when(jwtProperties.getIssuer()).thenReturn("smart_bookstore");
 
         assertThrows(JwtService.InvalidAccessTokenException.class,
                 () -> jwtService.parseAccessToken("not-a-token"));

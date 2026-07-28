@@ -2,7 +2,7 @@ server:
   port: 8081
 spring:
   application:
-    name: Factory_Test_Demo
+    name: smart_bookstore
   # 默认排除 Milvus 自动装配，避免仅引入 starter 就强连；真正启用由 ai.rag.enabled=true
   # 时 AiVectorConfig @Import（显式导入不受本 exclude 影响）。当前默认 ai.rag.enabled=true。
   autoconfigure:
@@ -11,9 +11,17 @@ spring:
   # 敏感配置：激活 local profile → application-local.yaml（已 gitignore）
   sql:
     init:
-      mode: always
-      schema-locations: classpath:db/schema.sql
-      continue-on-error: false
+      # 表结构改由 Flyway 管理，禁止与 sql.init 双通道
+      mode: never
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    encoding: UTF-8
+    # 空库：正常执行 V1；已有库且无历史表：记 baseline=1，跳过 V1 内容
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: existing_schema
+    validate-on-migrate: true
   mail:
     host: ${MAIL_HOST:smtp.qq.com}
     port: ${MAIL_PORT:465}
@@ -41,7 +49,7 @@ spring:
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      pool-name: FactoryTestDemoHikariCP
+      pool-name: SmartBookstoreHikariCP
       minimum-idle: 5
       maximum-pool-size: 20
       idle-timeout: 600000
@@ -143,7 +151,7 @@ auth:
     refresh-expire-days: 7
     refresh-expire-days-remember: 30
     session-absolute-expire-days: 90
-    issuer: Factory_Test_Demo
+    issuer: smart_bookstore
   rate-limit:
     send-code-per-target-seconds: 60
     send-code-per-target-hourly: 5

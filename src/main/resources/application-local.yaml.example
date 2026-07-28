@@ -6,6 +6,10 @@
 #   mvn spring-boot:run -Dspring-boot.run.profiles=local
 #   或 IDEA Active profiles = local
 #
+# 中间件可用 Docker 一键启动（默认账号见 docker-compose.yml）：
+#   docker compose up -d
+#   docker compose --profile milvus up -d   # 需要 RAG 时
+#
 # 也可用同名环境变量覆盖（见下方注释中的变量名）。
 
 spring:
@@ -17,19 +21,20 @@ spring:
     password: your-smtp-authorization-code
   datasource:
     # DB_URL / DB_USERNAME / DB_PASSWORD
-    url: jdbc:mysql://localhost:3306/test_demo?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&allowMultiQueries=true&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048
+    # docker compose 默认：root / root
+    url: jdbc:mysql://localhost:3306/smart_bookstore?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&allowMultiQueries=true&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048
     username: root
-    password: your-db-password
+    password: root
   data:
     redis:
       host: localhost
       port: 6379
-      # REDIS_PASSWORD；无密码留空
+      # REDIS_PASSWORD；docker compose 默认无密码，留空
       password:
   rabbitmq:
     host: localhost
     port: 5672
-    # RABBITMQ_USERNAME / RABBITMQ_PASSWORD
+    # RABBITMQ_USERNAME / RABBITMQ_PASSWORD；docker compose 默认 guest/guest
     username: guest
     password: guest
     virtual-host: /

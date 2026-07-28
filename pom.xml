@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.zx</groupId>
-    <artifactId>Factory_Test_Demo</artifactId>
+    <artifactId>smart_bookstore</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Factory_Test_Demo</name>
-    <description>Factory_Test_Demo</description>
+    <name>smart_bookstore</name>
+    <description>智慧书城（Smart Bookstore）</description>
     <url/>
     <licenses>
         <license/>
@@ -67,6 +67,16 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+        <!-- Flyway：Boot 4 须用 starter；MySQL 支持为独立模块 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
         </dependency>
 
         <!-- MyBatis-Plus and MySQL for DB-backed auth -->

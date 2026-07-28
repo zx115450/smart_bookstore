@@ -1,7 +1,7 @@
 # 测试专用配置：默认运行单元测试，不连真实中间件，不调用真模型 / 真邮件
 spring:
   application:
-    name: Factory_Test_Demo
+    name: smart_bookstore
   # 测试不引入 Milvus，避免强连本地向量库
   autoconfigure:
     exclude:
@@ -10,6 +10,9 @@ spring:
   sql:
     init:
       mode: never
+  # 单元测试默认不连库；集成测试需显式开启并注入数据源
+  flyway:
+    enabled: false
   # 禁用邮件自动配置，避免无授权码触发异常
   mail:
     host: localhost
@@ -19,7 +22,7 @@ spring:
     test-connection: false
   # 占位数据源；单元测试不启用，IT 通过 @DynamicPropertySource 注入 Testcontainers
   datasource:
-    url: jdbc:mysql://localhost:3306/test_demo?useSSL=false
+    url: jdbc:mysql://localhost:3306/smart_bookstore?useSSL=false
     username: root
     password: test
   data:
@@ -70,7 +73,7 @@ auth:
     refresh-expire-days: 7
     refresh-expire-days-remember: 30
     session-absolute-expire-days: 90
-    issuer: Factory_Test_Demo
+    issuer: smart_bookstore
   rate-limit:
     send-code-per-target-seconds: 60
     send-code-per-target-hourly: 5

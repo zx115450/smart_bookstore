@@ -10,7 +10,7 @@ public class AuthJwtProperties {
     private int refreshExpireDays = 7;
     private int refreshExpireDaysRemember = 30;
     private int sessionAbsoluteExpireDays = 90;
-    private String issuer = "Factory_Test_Demo";
+    private String issuer = "smart_bookstore";
 
     public String getSecret() {
         return secret;
