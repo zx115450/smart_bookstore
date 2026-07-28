@@ -1,0 +1,1 @@
+import{r as e}from"./index-BL2iV7xC.js";function i(){return e.get("/api/cart/items")}function n(t){return e.post("/api/cart/items",t)}function s(t,r){return e.put(`/api/cart/items/${t}`,r)}function u(t){return e.delete(`/api/cart/items/${t}`)}export{n as a,u as d,i as g,s as u};

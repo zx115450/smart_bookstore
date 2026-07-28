@@ -1,0 +1,1 @@
+import{r as i}from"./index-BL2iV7xC.js";function n(a){return i.post("/api/ai/chat",a,{timeout:6e4})}function r(){return i.post("/api/ai/admin/reindex")}function t(a){return i.post(`/api/ai/admin/reindex/${a}`)}function o(){return i.post("/api/ai/admin/reindex-faq")}export{t as a,o as b,n as c,r};

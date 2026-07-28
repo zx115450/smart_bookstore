@@ -1,6 +1,8 @@
 server:
   port: 8081
 spring:
+  profiles:
+    active: local
   application:
     name: smart_bookstore
   # 默认排除 Milvus 自动装配，避免仅引入 starter 就强连；真正启用由 ai.rag.enabled=true
