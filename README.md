@@ -1,6 +1,8 @@
 # Smart Bookstore - 智慧书城
 
-一个基于 Spring Boot 4.1 + Spring AI 2.0 构建的「智慧书城」综合 Demo，涵盖 AI 客服、图书商城、借阅、预约、签到、秒杀、优惠券、RBAC 认证等模块。项目用于展示现代 Java 后端技术栈在书店/图书馆场景下的完整实践能力。
+一个基于 Spring Boot 4.1 + Spring AI 2.0 构建的「智慧书城」综合 Demo，涵盖 AI 客服、图书商城、借阅、预约、签到、秒杀、优惠券、RBAC 认证等模块。仓库内同时提供 **便携 Nginx + 前端静态包**（`nginx-smart-bookstore/`），可在 Windows 上一键打开用户端与管理端页面并反代后端 API。
+
+项目用于展示现代 Java 后端技术栈在书店 / 图书馆场景下的完整实践能力，并配套 [学习文档中心](docs/README.md)。
 
 ---
 
@@ -10,6 +12,7 @@
 - [模块说明](#模块说明)
 - [环境依赖](#环境依赖)
 - [快速开始](#快速开始)
+- [启动前端（Nginx）](#启动前端nginx)
 - [配置文件说明](#配置文件说明)
 - [数据库初始化](#数据库初始化)
 - [主要 API](#主要-api)
@@ -31,7 +34,8 @@
 | 数据层 | MyBatis-Plus 3.5.9、MySQL 8+、HikariCP |
 | 缓存与消息 | Redis、RabbitMQ |
 | AI 与向量 | Spring AI 2.0.0、OpenAI 兼容协议（DeepSeek / 通义千问）、Milvus |
-| 工具链 | Lombok、Maven、Jackson |
+| 前端演示 | Vue 3 构建产物 + 便携 Nginx（`nginx-smart-bookstore/`，默认 `8088`） |
+| 工具链 | Lombok、Maven、Jackson、Docker Compose |
 
 ---
 
@@ -109,10 +113,14 @@
 - Maven 3.9+
 - Docker / Docker Compose（推荐，用于一键拉起中间件）
 
-推荐前端联调地址：
+推荐访问地址：
 
-- 默认后端端口：`http://localhost:8081`
-- 默认前端成功回调：`http://localhost:5173/oauth/qq/success`
+| 用途 | 地址 |
+| --- | --- |
+| 后端 API | `http://localhost:8081` |
+| 前端页面（仓库内 Nginx） | `http://localhost:8088`（`/api` 反代到 `8081`） |
+| 前端 Vite 开发（可选） | `http://localhost:5173` |
+| QQ OAuth 成功回调 | 使用 Nginx 时改为 `http://localhost:8088/oauth/qq/success` |
 
 ---
 
@@ -121,7 +129,7 @@
 ### 1. 克隆并导入
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/zx115450/smart_bookstore.git
 cd smart_bookstore
 ```
 
@@ -190,17 +198,45 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 
 或使用 IDEA 直接运行 `SmartBookstoreApplication`，并设置 Active profiles 为 `local`。
 
-### 6. 验证
+### 6. 启动前端（Nginx）
 
-应用启动后访问：
+后端起来后，用仓库自带的便携 Nginx 打开已构建的前端：
+
+```bash
+# Windows：双击或在命令行执行
+nginx-smart-bookstore\start.bat
+```
+
+浏览器访问：**http://localhost:8088**
+
+- 静态资源目录：`nginx-smart-bookstore/html/`
+- `/api/` 反代到本机后端 `http://127.0.0.1:8081`
+- 停止：`nginx-smart-bookstore\stop.bat`
+- 从前端工程重新打包并同步：在前端仓库根目录执行构建后，或使用 `nginx-smart-bookstore\update-frontend.bat`（需本机有前端源码与 `npm`）
+
+配置见 `nginx-smart-bookstore/conf/nginx.conf`；说明见 [前端部署指南](docs/前端部署指南.md)。
+
+若使用 QQ 登录，请在 `application-local.yaml` 中把回调改为 `8088`：
+
+```yaml
+auth:
+  oauth:
+    qq:
+      frontend-success-url: http://localhost:8088/oauth/qq/success
+      frontend-error-url: http://localhost:8088/oauth/qq/error
+```
+
+### 7. 验证
+
+后端接口：
 
 ```bash
 curl http://localhost:8081/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"loginType":"email_code","email":"admin@example.com","code":"123456"}'
+  -d '{"loginType":"password","account":"admin","password":"123456"}'
 ```
 
-> 默认示例账号 `admin` 的密码为 `123456`（仅用于本地开发）。
+或直接打开 `http://localhost:8088`，使用示例账号 `admin` / `123456` 登录（仅本地开发）。
 
 ---
 
@@ -337,19 +373,18 @@ mvn -Dtest='!*IT' test
 ### 开发环境
 
 - 使用 `local` profile + `application-local.yaml`。
-- 启用 HikariCP 默认连接池与 Redis 缓存。
+- 中间件可用 `docker compose up -d`。
+- 前端演示：启动后端后运行 `nginx-smart-bookstore/start.bat`，访问 `http://localhost:8088`。
 - AI 模型使用 DeepSeek / 通义千问在线 API。
 
 ### 生产环境
 
-- 必须外部化所有密钥（JWT Secret、数据库密码、邮箱授权码、API Key），禁止保留 `application.yaml` 中的默认值。
+- 必须外部化所有密钥（JWT Secret、数据库密码、邮箱授权码、API Key），禁止把真实密钥写回已提交的配置。
 - 确认 `spring.sql.init.mode=never`，表结构只走 Flyway。
-- 引入 `spring-boot-starter-actuator` 暴露健康检查端点。
-- 配置日志聚合（ELK / Loki）与监控告警（Prometheus + Grafana）。
+- 使用 Nginx / Gateway 做反向代理、HTTPS 终止与限流；本仓库 `nginx-smart-bookstore/` 可作为本地 / 演示参考，生产请按域名与证书另行加固。
 - 对 Redis、RabbitMQ、Milvus 使用集群或云服务实例。
-- 使用 Nginx / Gateway 做反向代理、HTTPS 终止与限流。
 
-前端独立仓库的打包、Nginx 托管与回调 URL 对齐，见 **[前端部署指南](docs/前端部署指南.md)**。
+前端打包、回调 URL 对齐与 Nginx 细节见 **[前端部署指南](docs/前端部署指南.md)**。
 
 ---
 
@@ -365,7 +400,7 @@ mvn -Dtest='!*IT' test
 | [登录流程学习文档](docs/登录流程学习文档.md) | 统一登录与 Handler 工厂 |
 | [加深方向学习路线](docs/learning/README.md) | 高并发 / 缓存 / MQ / AI 工程分册 |
 | [测试板块分步实现指南](docs/测试板块分步实现指南.md) | T0～T6 测试补齐 |
-| [Flyway 落地指南](docs/Flyway落地指南.md) | 数据库版本化迁移 |
+| [前端部署指南](docs/前端部署指南.md) | 仓库内 Nginx（`8088`）与生产部署 |
 
 ---
 

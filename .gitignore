@@ -34,3 +34,7 @@ build/
 
 ### Local secrets ###
 src/main/resources/application-local.yaml
+
+### Portable Nginx runtime ###
+nginx-smart-bookstore/logs/*.log
+nginx-smart-bookstore/logs/nginx.pid

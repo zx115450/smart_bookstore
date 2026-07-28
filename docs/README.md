@@ -109,8 +109,9 @@
 
 | 文档 | 关联要点 |
 | --- | --- |
-| [前端部署指南](./前端部署指南.md) | 打包与 Nginx |
-| [前端生成提示词](./前端生成提示词.md) | 前端协作提示 |
+| [前端部署指南](./前端部署指南.md) | 仓库内 `nginx-smart-bookstore/`（`8088`）+ 生产 Nginx |
+| [前端生成提示词](./前端生成提示词.md) | 用 AI 生成前端工程的提示词 |
+| [前后端联调文档](./前后端联调文档.md) | 端口、代理、OAuth 回调 |
 | [智慧书城项目业务价值点](./智慧书城项目业务价值点.md) | 业务卖点 |
 
 ### 进阶路线
@@ -136,5 +137,6 @@
 
 根目录相关：
 
-- [README.md](../README.md)：快速开始、模块与 API 概览  
-- [docker-compose.yml](../docker-compose.yml)：MySQL / Redis / RabbitMQ（可选 Milvus）
+- [README.md](../README.md)：快速开始、模块与 API 概览、Nginx 前端启动  
+- [docker-compose.yml](../docker-compose.yml)：MySQL / Redis / RabbitMQ（可选 Milvus）  
+- [nginx-smart-bookstore/](../nginx-smart-bookstore/README.md)：便携 Nginx 前端演示（`8088`）
