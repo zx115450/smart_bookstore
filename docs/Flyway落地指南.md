@@ -7,7 +7,6 @@
 
 把「手跑 `schema.sql` + `migration-*.sql`」改成 **启动时自动、可追溯的版本化迁移**。
 
-对应改进项：[IMPROVEMENTS.md](../IMPROVEMENTS.md) P0-5（**已落地**）。
 
 ---
 
@@ -177,7 +176,6 @@ spring:
 | `src/main/resources/db/archive/` | 历史手工脚本 |
 | `src/main/resources/application.yaml` | `flyway.*` / `sql.init` |
 | `pom.xml` | Flyway 依赖 |
-| [IMPROVEMENTS.md](../IMPROVEMENTS.md) | P0-5 |
 
 官方参考：
 

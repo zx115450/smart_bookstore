@@ -366,7 +366,6 @@ mvn -Dtest='!*IT' test
 | [加深方向学习路线](docs/learning/README.md) | 高并发 / 缓存 / MQ / AI 工程分册 |
 | [测试板块分步实现指南](docs/测试板块分步实现指南.md) | T0～T6 测试补齐 |
 | [Flyway 落地指南](docs/Flyway落地指南.md) | 数据库版本化迁移 |
-| [IMPROVEMENTS.md](IMPROVEMENTS.md) | 可完善项清单（P0 / P1 / P2） |
 
 ---
 

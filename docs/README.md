@@ -137,5 +137,4 @@
 根目录相关：
 
 - [README.md](../README.md)：快速开始、模块与 API 概览  
-- [IMPROVEMENTS.md](../IMPROVEMENTS.md)：可完善项（P0 / P1 / P2）  
 - [docker-compose.yml](../docker-compose.yml)：MySQL / Redis / RabbitMQ（可选 Milvus）
