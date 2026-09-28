@@ -1,20 +1,35 @@
 package com.zx;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.reactivex.rxjava3.internal.operators.observable.BlockingObservableLatest;
+import jakarta.annotation.Resource;
+import okhttp3.Call;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
+import org.redisson.Redisson;
+import org.redisson.api.*;
+import org.redisson.api.queue.QueueAddArgs;
+import org.redisson.config.Config;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.*;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.sql.*;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 轻量级单测：不启动完整 Spring Boot 容器。
  * 含本机「分桶近似滑动窗口」热点计数示例（对应缓存 C5-B 思路）。
  */
+@SpringBootTest
 class SmartBookstoreApplicationTests {
 
     /** bookId → (bucketIndex → count) */
@@ -33,21 +49,136 @@ class SmartBookstoreApplicationTests {
     private static final long BUCKET_MS = 10_000L;
     private static final long THRESHOLD = 50L;
 
+    private final StringRedisTemplate redisTemplate;
+
+    @Autowired
+    SmartBookstoreApplicationTests(StringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
+
     @FunctionalInterface
     private interface func {
         int apply(int a, int b, int c);
     }
 
     @Test
-    void test_d() {
+    void fnn  () throws IOException {
+        LettuceConnectionFactory factory = new LettuceConnectionFactory("localhost", 6379);
+        factory.afterPropertiesSet();
+        StringRedisTemplate redisTemplate = new StringRedisTemplate(factory);
+        redisTemplate.afterPropertiesSet();
+        String Key = "gay:zx";
+        redisTemplate.opsForValue().setBit(Key , 0 ,  true );
+        if (Boolean.TRUE.equals(redisTemplate.opsForValue().getBit(Key , 0 ))){
+            System.out.println("gay");
+        }
+        byte[] execute = redisTemplate.execute((RedisCallback<byte[]>) (connect) -> {
+            byte[] bytes = connect.get(Key.getBytes());
+            return bytes;
+            });
+        if ((execute[0]&(1<<7)) != 0) {
+            System.out.println("gay");
+        }
 
+        List<Long> list = redisTemplate.opsForValue().bitField(Key,
+                BitFieldSubCommands.create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(31))
+                        .valueAt(0));
 
 
     }
 
 
 
-    class Parent {
+
+    @Test
+    void test_d() throws InterruptedException {
+        Supplier<Config> supplier = () -> {
+            Config config = new Config();
+            config.useSingleServer().setAddress("redis://127.0.0.1:6379");
+            return config;
+        };
+        RedissonClient redisson = Redisson.create(
+                supplier.get()
+        );
+        String key = "gay:delay:lockDeque";
+        RBlockingDeque<String> blockingDeque = redisson.getBlockingDeque(key);
+        RDelayedQueue<String> delayedQueue = redisson.getDelayedQueue(blockingDeque);
+        delayedQueue.offer("gay" , 1 , TimeUnit.SECONDS);
+        String take = blockingDeque.take();
+        System.out.println(take);
+    }
+
+    class zx {
+        int name;
+        int age;
+        zx(int name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+    }
+
+    @Test
+    void test_d2() throws InterruptedException {
+        LettuceConnectionFactory factory = new LettuceConnectionFactory("localhost", 6379);
+        factory.afterPropertiesSet();
+        StringRedisTemplate redisTemplate = new StringRedisTemplate(factory);
+        redisTemplate.afterPropertiesSet();
+
+        ZSetOperations<String, String> ops = redisTemplate.opsForZSet();
+        Set<ZSetOperations.@NonNull TypedTuple<String>> gay = ops.rangeWithScores("gay", 0, 9);
+        for (ZSetOperations.TypedTuple tuple : gay) {
+            String score = String.valueOf(tuple.getScore());
+            Object value = tuple.getValue();
+
+        }
+
+    }
+
+    @Test
+    void test_d3() throws InterruptedException, SQLException {
+        Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/tlias?useSSL=false&serverTimezone=UTC" , "root" , "1234");
+        PreparedStatement ps = connection.prepareStatement("select * from tlias.emp where id = ?");
+        ps.setInt(1 , 7);
+        ResultSet rs = ps.executeQuery();
+        while (rs.next()) {
+            String id = String.valueOf(rs.getInt("id"));
+            String age = rs.getString("name");
+            System.out.println(List.of(id , age));
+        }
+    }
+
+
+    @Test
+    void test_d4() throws InterruptedException {
+        ThreadPoolTaskExecutor pool = new ThreadPoolTaskExecutor();
+        pool.setCorePoolSize(4);
+        pool.setMaxPoolSize(8);
+        pool.setQueueCapacity(1000_000);
+        pool.setThreadNamePrefix("pool-");
+        pool.setKeepAliveSeconds(60);
+        pool.setAllowCoreThreadTimeOut(true);
+        pool.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        pool.initialize();
+
+        //自增id
+        ValueOperations<String, String> ops = redisTemplate.opsForValue();
+        //允许32位
+        Long id = ops.increment("gay:increment");
+
+
+
+    }
+
+
+    @Test
+    void test_d5() throws InterruptedException {
+
+    }
+
+
+
+    static class Parent {
         static {
             System.out.println("P static");
         }
@@ -59,6 +190,8 @@ class SmartBookstoreApplicationTests {
     private static long k = 100000;
     private static long sum = 0;
     private final ReentrantLock lock = new ReentrantLock();
+//    private final Condition condition = lock.newCondition();
+
     class Producer implements Runnable {
         @Override
         public void run() {

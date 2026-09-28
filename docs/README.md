@@ -44,6 +44,9 @@
 | [计算机 I/O 模型介绍学习文档](./计算机IO模型介绍学习文档.md) | BIO / NIO 背景；对接 Netty 路线 |
 | [前后端必备计算机网络知识](./前后端必备计算机网络知识.md) | HTTP / 跨域 / Cookie 等联调基础 |
 | [BFF 架构实战指南](./BFF架构实战指南.md) | 前后端边界与聚合层思路 |
+| [learning/Oracle 使用文档](./learning/Oracle使用文档.md) | 实例/物理文件、用户表空间、过程触发器、客户端（通用基础） |
+| [learning/Java 使用 Oracle 文档](./learning/Java使用Oracle文档.md) | JDBC / Spring Boot / MyBatis 连接 Oracle，与 MySQL 差异 |
+| [learning/MySQL 与 Oracle 保证 CP 面试文档](./learning/MySQL与Oracle保证CP面试文档.md) | CAP、MySQL 半同步/GR、Oracle RAC/Data Guard、高频题与口述 |
 
 ### 书城、缓存与一致性（`com.zx.bookstore`）
 
@@ -53,6 +56,9 @@
 | [书城系统分阶段实施指南](./书城系统分阶段实施指南.md) | 分期落地 |
 | [智慧书城分步实现指南](./智慧书城分步实现指南.md) | 总实施路线 |
 | [Redis 缓存查询三种方案学习文档](./Redis缓存查询三种方案学习文档.md) | Cache Aside / 布隆 / 逻辑过期 |
+| [learning/Redis 动态拓扑接入学习文档](./learning/Redis动态拓扑接入学习文档.md) | 单体 / 主从 / 哨兵 / 分片集群：`bookstore.redis.mode` |
+| [learning/Elasticsearch 学习文档](./learning/Elasticsearch学习文档.md) | 全文检索加深；现状为 MySQL `LIKE`，规划可选演进 |
+| [learning/Spring Boot 使用 Binlog 学习文档](./learning/SpringBoot-Binlog学习文档.md) | CDC：Canal / Debezium → Spring Boot 删缓存 / 同步搜索 |
 | [生产可用布隆过滤器学习文档](./生产可用布隆过滤器学习文档.md) | Bitmap 布隆防穿透 |
 | [生产可用逻辑过期缓存学习文档](./生产可用逻辑过期缓存学习文档.md) | 互斥重建热 Key |
 | [Redis 布隆过滤器 Bitmap 实现原理](./Redis布隆过滤器Bitmap实现原理.md) | 原理补充 |
@@ -80,10 +86,11 @@
 | --- | --- |
 | [P4 秒杀业务流程与技术栈](./P4秒杀业务流程与技术栈.md) | Lua 扣减 + MQ 发券 |
 | [生产可用令牌桶限流学习文档](./生产可用令牌桶限流学习文档.md) | grab 双维度限流 |
-| [RabbitMQ 使用指南学习文档](./RabbitMQ使用指南学习文档.md) | 秒杀 / 订单超时 / 死信 |
+| [RabbitMQ 使用指南学习文档](./RabbitMQ使用指南学习文档.md) | 本仓库拓扑、配置、发消与重试实操 |
 | [learning/秒杀令牌桶限流](./learning/秒杀令牌桶限流.md) | 代码级拆解 |
 | [learning/消息队列](./learning/消息队列.md) | MQ 加深 |
 | [learning/消息模型与投递语义](./learning/消息模型与投递语义.md) | 投递语义 |
+| [learning/MQ 本地重试与 Spring Template](./learning/MQ本地重试与Spring-Template学习文档.md) | Retry 队列 / 本地重试 / `*Template` |
 
 ### AI 客服（`com.zx.ai`）
 
@@ -93,7 +100,8 @@
 | [AI 客服技术方案](./AI客服技术方案.md) | 方案总览 |
 | [AI 模块分板块实施流程](./AI模块分板块实施流程.md) | 分步实施 |
 | [AI 客服全链路实现思路与方案学习文档](./AI客服全链路实现思路与方案学习文档.md) | 全链路串联 |
-| [Spring AI 框架核心内容学习文档](./SpringAI框架核心内容学习文档.md) | ChatClient / Tool / VectorStore |
+| [Spring AI 框架核心内容学习文档](learning/SpringAI框架核心内容学习文档.md) | ChatClient / Tool / VectorStore |
+| [Spring AI 常用类学习文档](learning/SpringAI常用类学习文档.md) | 常用类职责、原理、Boot 加载机制 |
 | [向量检索策略与存储单元](./向量检索策略与存储单元.md) | Embedding / Milvus |
 
 ### 可观测性与测试

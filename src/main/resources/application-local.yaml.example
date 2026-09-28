@@ -47,6 +47,38 @@ spring:
         # 或环境变量 DASHSCOPE_API_KEY
         api-key: your-dashscope-api-key
 
+# Redis 拓扑（默认单体，与 docker compose 单节点一致）
+bookstore:
+  redis:
+    mode: standalone
+    password:
+    standalone:
+      host: localhost
+      port: 6379
+    # 主从示例：
+    # mode: master-replica
+    # master-replica:
+    #   master-host: localhost
+    #   master-port: 6379
+    #   nodes:
+    #     - localhost:6380
+    # 哨兵示例：
+    # mode: sentinel
+    # sentinel:
+    #   master: mymaster
+    #   nodes:
+    #     - localhost:26379
+    #     - localhost:26380
+    #     - localhost:26381
+    # 分片集群示例：
+    # mode: cluster
+    # cluster:
+    #   nodes:
+    #     - redis-cluster-1:7000
+    #     - redis-cluster-2:7001
+    #     - redis-cluster-3:7002
+    #   max-redirects: 5
+
 auth:
   jwt:
     # JWT_SECRET：至少 32 字节随机串，生产必须更换

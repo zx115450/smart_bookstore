@@ -1,523 +1,71 @@
-# 从秒杀 / 订单超时学 RabbitMQ
+# smart_bookstore RabbitMQ 使用指南
 
 > **项目**：smart_bookstore（智慧书城）  
-> **文档类型**：学习文档 · 关联本仓库业务代码  
-> **关联包 / 模块**：`com.zx.bookstore.seckill / trade`  
-> **建议前置**：[消息队列](./learning/消息队列.md)、[P4 秒杀业务流程与技术栈](./P4秒杀业务流程与技术栈.md)
+> **文档类型**：使用指南 · 对照本仓库实现  
+> **关联包**：`com.zx.bookstore.seckill` · `com.zx.bookstore.trade` · `com.zx.config.mq`  
+> **加深阅读**：[消息队列](./learning/消息队列.md) · [消息模型与投递语义](./learning/消息模型与投递语义.md) · [MQ 重试与 Spring Template](./learning/MQ本地重试与Spring-Template学习文档.md)
 
-## 学习目标
+本文说明 **本项目如何用 RabbitMQ**，不讲通用概念百科。读完应能：本地起 Broker、看懂两条业务拓扑、按现有模式发消息 / 消费 / 重试 / 进死信。下文代码均摘自本仓库，路径已标注。
 
-1. 理解 Exchange、Queue、Routing Key 与死信拓扑
-2. 掌握生产者发消息与消费者手动 ACK 模式
-3. 分析秒杀异步落库与订单超时两类 MQ 场景
+---
 
-## 与本仓库的对应关系
+## 1. 项目里 MQ 干什么
 
-| 路径 | 说明 |
+| 场景 | 目的 | 入口 |
+| --- | --- | --- |
+| 秒杀异步发券 | Lua 抢券成功后立刻返回「排队中」，落库发券异步完成 | `SeckillMqProducer` → `seckill.order` |
+| 购书超时关单 | 下单后延迟约 15 分钟，仍未支付则取消 | `TradeMqProducer` → `trade.order.timeout` |
+
+共性约定：
+
+- 交换机 / 队列在 Spring `@Configuration` 里声明，启动时自动建拓扑
+- 消息体 JSON（`JacksonJsonMessageConverter`）
+- 消费端 **手动 ACK**（`acknowledge-mode: manual`）
+- 失败默认走 **Broker retry 队列**（TTL + DLX 回主队列），耗尽后进 **DLQ**
+- 业务幂等靠状态机 / 唯一键，不依赖「消息只投递一次」
+
+依赖：
+
+```xml
+<!-- pom.xml -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-amqp</artifactId>
+</dependency>
+```
+
+---
+
+## 2. 本地快速上手
+
+### 2.1 启动 Broker
+
+```bash
+docker compose up -d rabbitmq
+```
+
+| 项 | 默认值 |
 | --- | --- |
-| `src/main/java/com/zx/bookstore/seckill/config/RabbitMqConfig.java` | 对照阅读 |
-| `src/main/java/com/zx/bookstore/seckill/consumer/SeckillOrderConsumer.java` | 对照阅读 |
-| `src/main/java/com/zx/bookstore/trade/config/TradeMqConfig.java` | 对照阅读 |
-| `src/main/java/com/zx/bookstore/trade/consumer/TradeOrderTimeoutConsumer.java` | 对照阅读 |
+| AMQP | `localhost:5672` |
+| 管理台 | [http://localhost:15672](http://localhost:15672) |
+| 账号 | `guest` / `guest` |
 
-读理论时请打开上表文件对照；改代码前先跑通 `docker compose up -d` 与 `local` profile。
+镜像：`rabbitmq:3.13-management-alpine`（见 `docker-compose.yml`）。
 
----
+### 2.2 启用延迟消息插件（购书超时必需）
 
-## 导读
-很多人第一次用 RabbitMQ，会卡在这几个问题上：
+购书超时使用 `x-delayed-message` 交换机。官方 management 镜像 **默认不带** 该插件，需自行安装并启用：
 
-1. **消息到底发给谁？** 是发给队列，还是发给交换机？
-2. **Exchange、Queue、Binding、Routing Key** 分别干什么？
-3. 消费失败了怎么办？ACK、NACK、重试、死信又是什么关系？
-4. 什么时候用 Direct，什么时候用 Topic / Fanout？
-
-本文按「先关系、再机制、后样例」的顺序讲清楚。读完你应该能自己画出一张拓扑图，并知道失败消息会去哪。
-
----
-
-## 一、先建立心智模型
-
-RabbitMQ 是一个 **消息中间件（Broker）**。生产者不直接把消息塞给某个消费者，而是：
-
-```text
-Producer（生产者）
-    │  发布消息
-    ▼
-Exchange（交换机）──按规则路由──► Queue（队列）──投递──► Consumer（消费者）
-         ▲
-         │ Binding（绑定）+ Routing Key（路由键）
+```bash
+# 容器内示意（插件 jar 需按 RabbitMQ 版本下载后放入 plugins 目录）
+rabbitmq-plugins enable rabbitmq_delayed_message_exchange
 ```
 
-记住三句话：
+未启用时，应用启动声明 `trade.delayed` 会失败。秒杀链路只用 Topic + Direct，不依赖该插件。
 
-1. **生产者只认识 Exchange**（多数情况下不直接往队列里塞）
-2. **消费者只认识 Queue**（从队列里取消息）
-3. **Binding 决定「交换机里的消息如何进入哪个队列」**
+### 2.3 应用连接配置
 
-可以把 Exchange 想成邮局分拣中心，Queue 想成各个信箱，Binding 是分拣规则。
-
----
-
-## 二、核心组件关系
-
-### 2.1 组件一览
-
-| 组件 | 英文 | 作用 |
-|------|------|------|
-| 生产者 | Producer | 发送消息的应用 |
-| 交换机 | Exchange | 接收消息，按规则转发到队列 |
-| 队列 | Queue | 消息的缓冲区，消费者从这里取 |
-| 绑定 | Binding | Exchange 与 Queue 之间的路由规则 |
-| 路由键 | Routing Key | 发布/绑定时用的「标签」，参与匹配 |
-| 消费者 | Consumer | 从队列消费并处理业务 |
-| 虚拟主机 | Virtual Host | 逻辑隔离（类似命名空间），权限按 vhost 划分 |
-| 连接/信道 | Connection / Channel | TCP 连接上可开多个 Channel，操作都在 Channel 上完成 |
-
-### 2.2 关系图（必看）
-
-```text
-                    ┌─────────────────────────────────────┐
-                    │              Broker                 │
-                    │                                     │
-  Producer ───────► │  Exchange                           │
-                    │     │                               │
-                    │     │ Binding (routing key 规则)     │
-                    │     ├──────────► Queue A ──► Consumer 1
-                    │     ├──────────► Queue B ──► Consumer 2
-                    │     └──────────► Queue C ──► Consumer 3
-                    │                                     │
-                    └─────────────────────────────────────┘
-```
-
-- **一条消息进入一个 Exchange**
-- **可能进入 0 个、1 个或多个 Queue**（取决于交换机类型和绑定）
-- **一个 Queue 可被多个 Consumer 竞争消费**（默认轮询分发）
-
-### 2.3 为什么不让生产者直接写队列？
-
-解耦。业务方只约定「发到哪个交换机、带什么 routing key」，不必知道下游有几个队列、几个服务在消费。以后加一个审计队列，只需多绑一条 Binding，生产者代码不用改。
-
----
-
-## 三、交换机类型（怎么路由）
-
-RabbitMQ 常见四种 Exchange。**类型决定「routing key 怎么用」**。
-
-### 3.1 Direct（直连）
-
-**规则**：队列绑定的 routing key **完全相等** 才投递。
-
-```text
-Exchange(direct)  "order"
-  ├─ binding key = "order.pay"     → queue.order.pay
-  └─ binding key = "order.cancel"  → queue.order.cancel
-
-发布 routingKey="order.pay" → 只进 queue.order.pay
-```
-
-适合：明确的一对一/少对少路由，如「支付成功通知」「取消通知」分开处理。
-
-### 3.2 Topic（主题）
-
-**规则**：routing key 按 `.` 分段，支持通配符：
-
-| 通配符 | 含义 |
-|--------|------|
-| `*` | 匹配 **恰好一段** |
-| `#` | 匹配 **零段或多段** |
-
-```text
-Exchange(topic)  "biz.topic"
-  ├─ "order.*"     → 匹配 order.pay、order.cancel（一段）
-  ├─ "order.#"     → 匹配 order、order.pay、order.pay.success（多段）
-  └─ "*.error"     → 匹配 pay.error、sms.error
-
-发布 "order.pay.success"
-  → 进绑定了 order.# 的队列
-  → 不进 order.*（因为多了一段）
-```
-
-适合：日志分级、业务事件总线、一个交换机挂多种下游。
-
-### 3.3 Fanout（广播）
-
-**规则**：**忽略** routing key，绑定到该交换机的 **所有队列** 都收到一份拷贝。
-
-```text
-Exchange(fanout)  "notify.fanout"
-  ├─ → queue.sms
-  ├─ → queue.email
-  └─ → queue.push
-
-发布任意消息 → 三个队列各一份
-```
-
-适合：同一事件通知多个独立系统（短信、邮件、站内信）。
-
-### 3.4 Headers（较少用）
-
-按消息头（headers）匹配，而不是 routing key。灵活但不如 Topic 直观，生产中相对少见。
-
-### 3.5 选型速查
-
-| 场景 | 推荐 |
-|------|------|
-| 固定几种业务类型，精确投递 | Direct |
-| 事件多、要按模式订阅 | Topic |
-| 一发多收、完全广播 | Fanout |
-| 需要按自定义属性过滤 | Headers |
-
----
-
-## 四、队列与消息属性
-
-### 4.1 队列常见参数
-
-| 参数/特性 | 含义 |
-|-----------|------|
-| durable | 队列元数据持久化，Broker 重启后队列还在 |
-| exclusive | 仅当前连接可见，连接断开队列删除 |
-| autoDelete | 最后一个消费者断开后自动删除 |
-| TTL（消息/队列） | 超时未消费则过期（可进死信） |
-| max-length | 队列最大长度，超限可丢弃或进死信 |
-| 惰性队列 lazy | 尽量落盘，适合堆积场景 |
-
-### 4.2 消息持久化
-
-- 队列 `durable=true` **不等于** 消息一定不丢  
-- 消息还需 `deliveryMode=2`（持久化）  
-- 生产端建议开启 **Publisher Confirm**，确认 Broker 已接收  
-
-三者配合，才能在宕机场景下尽量不丢（仍非 100%，极端情况要靠业务幂等）。
-
-### 4.3 消息结构（概念）
-
-```text
-Envelope
-  ├─ Exchange / Routing Key
-  ├─ Properties（contentType、messageId、headers、expiration…）
-  └─ Body（业务 JSON / 二进制）
-```
-
-业务上通常把 JSON 放在 Body，把重试次数、追踪 ID 放在 Headers。
-
----
-
-## 五、生产与消费的基本流程
-
-### 5.1 生产端伪代码（概念）
-
-```java
-// 1. 建立连接与信道
-Connection connection = factory.newConnection();
-Channel channel = connection.createChannel();
-
-// 2. 声明交换机、队列、绑定（幂等，可重复声明）
-channel.exchangeDeclare("biz.topic", "topic", true);
-channel.queueDeclare("queue.order.pay", true, false, false, null);
-channel.queueBind("queue.order.pay", "biz.topic", "order.pay");
-
-// 3. 发布
-String body = "{\"orderId\":1001,\"amount\":99.00}";
-channel.basicPublish(
-    "biz.topic",          // exchange
-    "order.pay",          // routing key
-    MessageProperties.PERSISTENT_TEXT_PLAIN,
-    body.getBytes()
-);
-```
-
-### 5.2 消费端伪代码（概念）
-
-```java
-channel.basicQos(10); // 预取：未 ACK 前最多塞给该消费者 10 条
-
-channel.basicConsume("queue.order.pay", false, (consumerTag, delivery) -> {
-    try {
-        String json = new String(delivery.getBody());
-        handle(json); // 业务处理
-        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-    } catch (Exception e) {
-        // 见下文 ACK / NACK
-        channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
-    }
-}, consumerTag -> { });
-```
-
-注意：`autoAck=false` 时必须自己 Ack/Nack，否则消息会一直处于 Unacked，最终可能被重新投递。
-
----
-
-## 六、各种处理机制（重点）
-
-### 6.1 确认机制：ACK / NACK / Reject
-
-| 操作 | 含义 |
-|------|------|
-| `basicAck` | 处理成功，Broker 删除该消息 |
-| `basicNack` | 处理失败；可指定是否 `requeue` |
-| `basicReject` | 类似 Nack，但不支持批量 |
-
-```text
-成功 ──────────────────────────────► Ack ──► 消息从队列删除
-
-失败 + requeue=true ───────────────► 消息重新回到队列（可能立刻再被消费）
-失败 + requeue=false ──────────────► 丢弃；若配置了死信，则进入死信交换机
-```
-
-**坑**：对「毒消息」（怎么处理都失败）使用 `requeue=true`，会形成死循环打满 CPU。生产上通常：`requeue=false` + 死信，或有限次重试后再进死信。
-
-### 6.2 预取 Prefetch（QoS）
-
-```text
-basicQos(prefetchCount = N)
-```
-
-含义：消费者最多有 N 条 **未确认** 消息。  
-作用：避免一个慢消费者被塞爆，也避免公平性太差。
-
-经验：
-
-- CPU 型任务：prefetch 可以小一点（如 1～10）  
-- 快速 IO 型：可适当增大  
-
-### 6.3 竞争消费与公平分发
-
-同一队列挂多个 Consumer：
-
-```text
-Queue ──► Consumer A
-      └─► Consumer B
-```
-
-默认按轮询分发。谁 Ack 快，谁更能继续拿新消息（配合 prefetch）。
-
-这是水平扩展消费者的基础：**加机器 = 加 Consumer**，不用改生产者。
-
-### 6.4 消息 TTL 与队列 TTL
-
-- **消息 TTL**：单条消息的过期时间  
-- **队列 TTL**：队列里所有消息的统一过期时间  
-
-过期后消息被丢弃；若队列配置了死信交换机，则进入死信链路。  
-常用于：订单超时关闭的「延迟效果」（配合死信，见样例 3）。
-
-### 6.5 死信（DLX / DLQ）
-
-**死信交换机（Dead Letter Exchange）** 不是特殊类型，只是一个普通 Exchange，被指定为「死信去处」。
-
-消息变成死信的常见原因：
-
-1. 消费者 `Nack/Reject` 且 `requeue=false`  
-2. 消息 TTL 过期  
-3. 队列达到最大长度，消息被挤出  
-
-```text
-业务队列 order.queue
-  参数：
-    x-dead-letter-exchange = order.dlx
-    x-dead-letter-routing-key = order.dead
-
-失败 / 过期 / 超长
-        │
-        ▼
-   order.dlx ──► order.dead.queue（死信队列）
-                      │
-                      ▼
-                 对账 / 告警 / 人工处理
-```
-
-死信的价值：**失败消息与正常流量隔离**，主队列继续跑，失败可事后补偿。
-
-### 6.6 幂等消费
-
-MQ **至少一次投递** 很常见（网络重试、Consumer 重启未 Ack 等），所以业务必须幂等：
-
-```text
-同一 messageId / 业务唯一键 处理两次 = 只产生一次副作用
-```
-
-常见手段：
-
-- 数据库唯一索引（订单号、幂等键）  
-- Redis `SETNX` 处理标记  
-- 状态机：只允许 `CREATED → PAID`，重复支付直接返回成功  
-
-**没有幂等的重试/死信，都可能把账做花。**
-
-### 6.7 发布确认与返回（生产端可靠）
-
-| 机制 | 作用 |
-|------|------|
-| Publisher Confirm | Broker 确认已收到（或写入磁盘策略满足） |
-| Mandatory + Return | 消息无法路由到任何队列时退回生产者 |
-
-适合对「发出去」有强要求的场景；和消费端 Ack 是两回事。
-
-### 6.8 事务 vs Confirm
-
-Channel 事务能保证发布原子性，但性能差。现代实践更推荐 **Publisher Confirm**，而不是 AMQP 事务。
-
----
-
-## 七、样例
-
-### 样例 1：Direct —— 订单支付结果通知
-
-**需求**：支付成功、支付失败走不同处理逻辑。
-
-```text
-Exchange: order.direct (direct)
-  order.pay.success → queue.pay.success
-  order.pay.fail    → queue.pay.fail
-```
-
-发布：
-
-```java
-channel.basicPublish("order.direct", "order.pay.success", null, body);
-```
-
-消费成功队列的服务发积分；失败队列的服务发站内信。互不影响。
-
----
-
-### 样例 2：Topic —— 日志收集
-
-**需求**：所有 `*.error` 进告警队列；`order.#` 进订单分析队列。
-
-```text
-Exchange: log.topic (topic)
-  *.error   → queue.alert
-  order.#   → queue.order.analytics
-```
-
-```text
-发布 routingKey = "order.pay.error"
-  → 同时进入 queue.alert 和 queue.order.analytics（各一份拷贝）
-```
-
-这就是 Topic 的典型用法：**一条事件，多种订阅。**
-
----
-
-### 样例 3：TTL + 死信 ——「延迟 30 分钟」关单（简化版）
-
-RabbitMQ 本身没有「延迟队列」一等公民（可用插件），经典做法是：
-
-```text
-1. 消息发到 delay.queue，设置 TTL = 30min
-2. delay.queue 不挂业务消费者
-3. 过期后经 DLX 进入 close.order.queue
-4. close.order.queue 的消费者执行「若仍未支付则关单」
-```
-
-```text
-Producer ──► delay.exchange ──► delay.queue (TTL=30m, DLX=close.exchange)
-                                      │ 到期
-                                      ▼
-                               close.exchange ──► close.order.queue ──► Consumer
-```
-
-注意：队列级 TTL 时，过期顺序与队列头有关；高精度延迟更推荐延迟插件或时间轮方案。
-
----
-
-### 样例 4：Fanout —— 用户注册成功后的多通道通知
-
-```text
-Exchange: user.registered (fanout)
-  → queue.mail
-  → queue.sms
-  → queue.growth（成长体系发新人礼）
-```
-
-注册服务只发一条「用户已注册」事件，三个下游独立扩缩容。某个通知挂了，不影响另外两个（各自队列堆积）。
-
----
-
-### 样例 5：消费失败进死信 + 对账（推荐心智）
-
-```text
-主队列 work.queue
-  成功 → Ack
-  失败 → Nack(requeue=false) → DLQ
-
-死信队列 work.dlq
-  → 记录日志 / 告警
-  → 根据业务键做补偿（回滚库存、标记失败单等）
-  → 一般不要无限重投主队列
-```
-
-伪代码：
-
-```java
-void onMessage(Message msg, Channel channel, long tag) throws IOException {
-    try {
-        process(msg);           // 业务，内部保证幂等
-        channel.basicAck(tag, false);
-    } catch (Exception e) {
-        log.error("process failed", e);
-        channel.basicNack(tag, false, false); // 进死信，不 requeue
-    }
-}
-
-void onDeadLetter(Message msg, Channel channel, long tag) throws IOException {
-    try {
-        reconcile(msg);         // 对账补偿，而不是盲目重试
-        channel.basicAck(tag, false);
-    } catch (Exception e) {
-        log.error("reconcile failed, need manual", e);
-        channel.basicNack(tag, false, false); // 避免死信里死循环
-    }
-}
-```
-
----
-
-## 八、Spring AMQP 声明拓扑（示意）
-
-概念与原生客户端一致，只是用 Bean 声明：
-
-```java
-@Bean
-DirectExchange orderExchange() {
-    return new DirectExchange("order.direct", true, false);
-}
-
-@Bean
-Queue paySuccessQueue() {
-    return QueueBuilder.durable("queue.pay.success")
-            .withArgument("x-dead-letter-exchange", "order.dlx")
-            .withArgument("x-dead-letter-routing-key", "order.dead")
-            .build();
-}
-
-@Bean
-Binding paySuccessBinding(Queue paySuccessQueue, DirectExchange orderExchange) {
-    return BindingBuilder.bind(paySuccessQueue)
-            .to(orderExchange)
-            .with("order.pay.success");
-}
-```
-
-消费：
-
-```java
-@RabbitListener(queues = "queue.pay.success")
-public void onPaySuccess(String body, Channel channel,
-                         @Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
-    try {
-        // ...
-        channel.basicAck(tag, false);
-    } catch (Exception e) {
-        channel.basicNack(tag, false, false);
-    }
-}
-```
-
-`application.yml` 中常见配置：
+敏感项写在 `application-local.yaml`（从 `application-local.yaml.example` 复制）：
 
 ```yaml
 spring:
@@ -527,62 +75,762 @@ spring:
     username: guest
     password: guest
     virtual-host: /
-    publisher-confirm-type: correlated
+```
+
+`application.yaml` 中与消费相关的固定项：
+
+```yaml
+spring:
+  rabbitmq:
     listener:
       simple:
         acknowledge-mode: manual
         prefetch: 10
 ```
 
-管理台默认：`http://localhost:15672`（用户 guest/guest，仅限本地）。
+重试与超时延迟：
+
+```yaml
+bookstore:
+  trade:
+    unpaid-cancel-delay-minutes: 15
+    # unpaid-cancel-delay-ms: 60000   # 联调可改为 1 分钟
+  mq:
+    retry:
+      enabled: true
+      strategy: queue          # 或 local
+      max-attempts: 3
+      initial-interval-ms: 1000
+      multiplier: 2.0
+      max-interval-ms: 10000
+```
+
+### 2.4 队列参数变更注意
+
+若本地已存在 **参数不一致** 的同名队列（例如改过 DLX / TTL 参数），Spring 无法原地改参，需在管理台删除旧队列后再启动。`RabbitMqConfig` 注释中已提示这一点。
 
 ---
 
-## 九、常见误区
+## 3. 代码地图
 
-| 误区 | 正解 |
-|------|------|
-| 消息发给队列 | 通常发给 **Exchange**，由 Binding 进队列 |
-| 队列持久化 = 消息不丢 | 还要消息持久化 + Confirm 等 |
-| 失败就 requeue=true | 毒消息会死循环；优先死信或有限重试 |
-| 有了 MQ 就不需要幂等 | MQ 常至少一次，**必须幂等** |
-| Fanout 还要精心设计 routing key | Fanout **忽略** routing key |
-| 一个业务一个 Broker 连接狂开 | 复用 Connection，多开 Channel |
+| 职责 | 路径 |
+| --- | --- |
+| 秒杀拓扑 + `RabbitTemplate` Bean | `seckill/config/RabbitMqConfig.java` |
+| 秒杀发送 | `seckill/service/SeckillMqProducer.java` |
+| 秒杀主消费 / 死信 | `seckill/consumer/SeckillOrderConsumer.java` · `SeckillDeadLetterConsumer.java` |
+| 购书超时拓扑 | `trade/config/TradeMqConfig.java` |
+| 超时发送 | `trade/service/TradeMqProducer.java` |
+| 超时主消费 / 死信 | `trade/consumer/TradeOrderTimeoutConsumer.java` · `TradeOrderTimeoutDeadLetterConsumer.java` |
+| 统一重试 | `config/mq/MqQueueRetrySupport.java` · `MqRetrySupport.java` · `BookstoreMqRetryProperties.java` |
 
 ---
 
-## 十、一张图串起来
+## 4. 拓扑总览
+
+### 4.1 秒杀：Topic + Retry + DLQ
 
 ```text
 Producer
-  │ basicPublish(exchange, routingKey, body)
-  ▼
-Exchange ──Binding──► Queue ──basicDeliver──► Consumer
-                          │
-                          ├─ Ack ──────────► 删除消息
-                          ├─ Nack+requeue ► 回队列
-                          └─ Nack 无 requeue + DLX ► 死信队列 ► 补偿/告警
+  └─ bookstore.topic ──routingKey=seckill.order──► seckill.order
+                                                      │
+                         失败且可重试：发到 seckill.order.retry（无消费者）
+                                                      │ per-message TTL
+                                                      │ 到期 DLX → bookstore.topic / seckill.order
+                                                      │
+                         超次 / 不可重试：Nack(requeue=false)
+                                                      ▼
+                                               seckill.dlx ──► seckill.order.dlq
+                                                      │
+                                                      ▼
+                                           SeckillDeadLetterConsumer（对账）
+```
+
+源码：`src/main/java/com/zx/bookstore/seckill/config/RabbitMqConfig.java`
+
+```java
+@Configuration
+public class RabbitMqConfig {
+
+    public static final String EXCHANGE = "bookstore.topic";
+    public static final String SECKILL_ORDER_QUEUE = "seckill.order";
+    public static final String SECKILL_ORDER_ROUTING_KEY = "seckill.order";
+    public static final String SECKILL_ORDER_RETRY_QUEUE = "seckill.order.retry";
+    public static final String SECKILL_DLX = "seckill.dlx";
+    public static final String SECKILL_ORDER_DLQ = "seckill.order.dlq";
+    public static final String SECKILL_ORDER_DLQ_ROUTING_KEY = "seckill.order.dlq";
+
+    @Bean
+    TopicExchange bookstoreTopicExchange() {
+        return new TopicExchange(EXCHANGE, true, false);
+    }
+
+    @Bean
+    DirectExchange seckillDeadLetterExchange() {
+        return new DirectExchange(SECKILL_DLX, true, false);
+    }
+
+    @Bean
+    Queue seckillOrderQueue() {
+        return QueueBuilder.durable(SECKILL_ORDER_QUEUE)
+                .withArgument("x-dead-letter-exchange", SECKILL_DLX)
+                .withArgument("x-dead-letter-routing-key", SECKILL_ORDER_DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    /** 无消费者；per-message TTL 到期后经 DLX 回到 bookstore.topic / seckill.order */
+    @Bean
+    Queue seckillOrderRetryQueue() {
+        return QueueBuilder.durable(SECKILL_ORDER_RETRY_QUEUE)
+                .withArgument("x-dead-letter-exchange", EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", SECKILL_ORDER_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    Queue seckillOrderDeadLetterQueue() {
+        return QueueBuilder.durable(SECKILL_ORDER_DLQ).build();
+    }
+
+    @Bean
+    Binding seckillOrderBinding(Queue seckillOrderQueue, TopicExchange bookstoreTopicExchange) {
+        return BindingBuilder.bind(seckillOrderQueue)
+                .to(bookstoreTopicExchange)
+                .with(SECKILL_ORDER_ROUTING_KEY);
+    }
+
+    @Bean
+    Binding seckillOrderDeadLetterBinding(Queue seckillOrderDeadLetterQueue,
+                                          DirectExchange seckillDeadLetterExchange) {
+        return BindingBuilder.bind(seckillOrderDeadLetterQueue)
+                .to(seckillDeadLetterExchange)
+                .with(SECKILL_ORDER_DLQ_ROUTING_KEY);
+    }
+
+    @Bean
+    JacksonJsonMessageConverter jacksonJsonMessageConverter() {
+        return new JacksonJsonMessageConverter();
+    }
+
+    @Bean
+    RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory,
+                                  JacksonJsonMessageConverter messageConverter) {
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        template.setMessageConverter(messageConverter);
+        return template;
+    }
+}
+```
+
+### 4.2 购书超时：延迟交换机 + Reentry + DLQ
+
+```text
+下单事务提交后
+  └─ trade.delayed (x-delayed-message)
+        header x-delay = 取消延迟毫秒
+        routingKey = trade.order.delay
+              │
+              ▼（到期）
+        trade.order.timeout
+              │
+              │ 失败可重试 → trade.order.timeout.retry（TTL）
+              │                 │ 到期 DLX
+              │                 └── trade.timeout.reentry ──► trade.order.timeout
+              │                     （故意不走 trade.delayed，避免再等 15 分钟）
+              │
+              │ 超次 / 不可重试 → Nack
+              ▼
+        trade.timeout.dlx ──► trade.order.timeout.dlq
+              │
+              ▼
+        再试关单；仍失败 → 写 trade_order_timeout_fail 后 Ack
+```
+
+源码：`src/main/java/com/zx/bookstore/trade/config/TradeMqConfig.java`
+
+```java
+@Configuration
+public class TradeMqConfig {
+
+    public static final String TRADE_DELAYED_EXCHANGE = "trade.delayed";
+    public static final String TRADE_ORDER_TIMEOUT_QUEUE = "trade.order.timeout";
+    public static final String TRADE_ORDER_TIMEOUT_ROUTING_KEY = "trade.order.delay";
+    public static final String TRADE_TIMEOUT_REENTRY_EXCHANGE = "trade.timeout.reentry";
+    public static final String TRADE_ORDER_TIMEOUT_REENTRY_ROUTING_KEY = "trade.order.timeout";
+    public static final String TRADE_ORDER_TIMEOUT_RETRY_QUEUE = "trade.order.timeout.retry";
+    public static final String TRADE_TIMEOUT_DLX = "trade.timeout.dlx";
+    public static final String TRADE_ORDER_TIMEOUT_DLQ = "trade.order.timeout.dlq";
+    public static final String TRADE_ORDER_TIMEOUT_DLQ_ROUTING_KEY = "trade.order.timeout.dlq";
+
+    @Bean
+    CustomExchange tradeDelayedExchange() {
+        Map<String, Object> args = new HashMap<>();
+        args.put("x-delayed-type", "direct");
+        return new CustomExchange(TRADE_DELAYED_EXCHANGE, "x-delayed-message", true, false, args);
+    }
+
+    @Bean
+    DirectExchange tradeTimeoutReentryExchange() {
+        return new DirectExchange(TRADE_TIMEOUT_REENTRY_EXCHANGE, true, false);
+    }
+
+    @Bean
+    Queue tradeOrderTimeoutQueue() {
+        return QueueBuilder.durable(TRADE_ORDER_TIMEOUT_QUEUE)
+                .withArgument("x-dead-letter-exchange", TRADE_TIMEOUT_DLX)
+                .withArgument("x-dead-letter-routing-key", TRADE_ORDER_TIMEOUT_DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    Queue tradeOrderTimeoutRetryQueue() {
+        return QueueBuilder.durable(TRADE_ORDER_TIMEOUT_RETRY_QUEUE)
+                .withArgument("x-dead-letter-exchange", TRADE_TIMEOUT_REENTRY_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", TRADE_ORDER_TIMEOUT_REENTRY_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    Queue tradeOrderTimeoutDeadLetterQueue() {
+        return QueueBuilder.durable(TRADE_ORDER_TIMEOUT_DLQ).build();
+    }
+
+    @Bean
+    DirectExchange tradeTimeoutDeadLetterExchange() {
+        return new DirectExchange(TRADE_TIMEOUT_DLX, true, false);
+    }
+
+    @Bean
+    Binding tradeOrderTimeoutBinding(Queue tradeOrderTimeoutQueue, CustomExchange tradeDelayedExchange) {
+        return BindingBuilder.bind(tradeOrderTimeoutQueue)
+                .to(tradeDelayedExchange)
+                .with(TRADE_ORDER_TIMEOUT_ROUTING_KEY)
+                .noargs();
+    }
+
+    @Bean
+    Binding tradeOrderTimeoutReentryBinding(Queue tradeOrderTimeoutQueue,
+                                            DirectExchange tradeTimeoutReentryExchange) {
+        return BindingBuilder.bind(tradeOrderTimeoutQueue)
+                .to(tradeTimeoutReentryExchange)
+                .with(TRADE_ORDER_TIMEOUT_REENTRY_ROUTING_KEY);
+    }
+
+    @Bean
+    Binding tradeOrderTimeoutDeadLetterBinding(Queue tradeOrderTimeoutDeadLetterQueue,
+                                               DirectExchange tradeTimeoutDeadLetterExchange) {
+        return BindingBuilder.bind(tradeOrderTimeoutDeadLetterQueue)
+                .to(tradeTimeoutDeadLetterExchange)
+                .with(TRADE_ORDER_TIMEOUT_DLQ_ROUTING_KEY);
+    }
+}
 ```
 
 ---
 
-## 十一、学习路径建议
+## 5. 场景一：秒杀异步发券
 
-1. 本地起 RabbitMQ，打开 15672，手动创建 Direct + 队列，用管理台发一条消息  
-2. 写最小 Producer / Consumer，观察 Ack 前后 Unacked 数量变化  
-3. 故意消费失败，对比 `requeue=true/false`  
-4. 给队列挂上 DLX，看消息如何进死信队列  
-5. 再用 Topic / Fanout 各做一个小样例  
+### 5.1 链路
 
-当你能不看文档画出「交换机 → 绑定 → 队列 → 消费者 → 死信」时，接入任何业务项目都会轻松很多。
+1. `SeckillService.grab`：令牌桶限流 → Redis Lua 扣库存 / 记用户
+2. 构造 `SeckillOrderMessage(userId, activityId, idempotencyKey)`
+3. `SeckillMqProducer.publishSeckillOrder` 发到 `bookstore.topic` / `seckill.order`
+4. **发送失败**：`rollbackGrab` 回滚 Redis，接口报系统繁忙
+5. 接口返回 `PROCESSING`；前端轮询 `getResult`
+6. `SeckillOrderConsumer` 调 `processSeckillOrder`：幂等查重 → 写订单 → 发券
+7. 发券失败：订单标 `FAILED`、回滚 Redis，**正常返回让主队列 Ack**（避免事务回滚冲掉 FAILED）
+8. 早期参数 / 配置类异常：抛出 → 重试或进 DLQ → `reconcileDeadLetter` 对账
+
+### 5.2 消息体
+
+`src/main/java/com/zx/bookstore/seckill/dto/SeckillOrderMessage.java`
+
+```java
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class SeckillOrderMessage {
+
+    private Long userId;
+    private Long activityId;
+    private String idempotencyKey;
+}
+```
+
+### 5.3 抢券成功后发送（含失败回滚）
+
+`SeckillService.grab` 片段：
+
+```java
+SeckillOrderMessage message = new SeckillOrderMessage(
+        principal.userId(), activityId, req.getIdempotencyKey());
+try {
+    seckillMqProducer.publishSeckillOrder(message);
+} catch (Exception e) {
+    log.error("publish seckill order failed, userId={}, activityId={}",
+            principal.userId(), activityId, e);
+    seckillRedisService.rollbackGrab(activityId, principal.userId());
+    throw SeckillException.systemBusy();
+}
+
+SeckillGrabResponse response = new SeckillGrabResponse();
+response.setActivityId(activityId);
+response.setStatus(SeckillOrderStatus.PROCESSING.name());
+response.setMessage("排队中，请稍后查询结果");
+return response;
+```
+
+生产者：`src/main/java/com/zx/bookstore/seckill/service/SeckillMqProducer.java`
+
+```java
+@Service
+@RequiredArgsConstructor
+public class SeckillMqProducer {
+
+    private final RabbitTemplate rabbitTemplate;
+
+    public void publishSeckillOrder(SeckillOrderMessage message) {
+        rabbitTemplate.convertAndSend(
+                RabbitMqConfig.EXCHANGE,
+                RabbitMqConfig.SECKILL_ORDER_ROUTING_KEY,
+                message
+        );
+    }
+}
+```
+
+### 5.4 主消费者（手动 ACK + 重试）
+
+`src/main/java/com/zx/bookstore/seckill/consumer/SeckillOrderConsumer.java`
+
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class SeckillOrderConsumer {
+
+    private final SeckillService seckillService;
+    private final MqRetrySupport mqRetrySupport;
+    private final MqQueueRetrySupport mqQueueRetrySupport;
+
+    @RabbitListener(queues = RabbitMqConfig.SECKILL_ORDER_QUEUE)
+    public void consume(SeckillOrderMessage message,
+                        Channel channel,
+                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag,
+                        @Header(value = MqQueueRetrySupport.RETRY_COUNT_HEADER, required = false)
+                        Integer retryCount) throws IOException {
+        try {
+            mqRetrySupport.execute("seckill.order",
+                    () -> seckillService.processSeckillOrder(message));
+            channel.basicAck(deliveryTag, false);
+        } catch (Exception e) {
+            if (mqQueueRetrySupport.tryScheduleRetry(
+                    "seckill.order",
+                    message,
+                    retryCount,
+                    RabbitMqConfig.SECKILL_ORDER_RETRY_QUEUE,
+                    e)) {
+                channel.basicAck(deliveryTag, false);
+                return;
+            }
+            log.error("consume seckill order failed → dead letter, message={}, retryCount={}",
+                    message, retryCount, e);
+            channel.basicNack(deliveryTag, false, false);
+        }
+    }
+}
+```
+
+ACK 语义：
+
+```text
+成功                          → basicAck
+可重试失败（QUEUE 策略）      → tryScheduleRetry 成功则 Ack（原消息离开主队列）
+超次 / BusinessException 等   → basicNack(..., requeue=false) → DLQ
+```
+
+### 5.5 死信对账
+
+`src/main/java/com/zx/bookstore/seckill/consumer/SeckillDeadLetterConsumer.java`
+
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class SeckillDeadLetterConsumer {
+
+    private final SeckillService seckillService;
+
+    @RabbitListener(queues = RabbitMqConfig.SECKILL_ORDER_DLQ)
+    public void consume(SeckillOrderMessage message, Channel channel,
+                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+        try {
+            seckillService.reconcileDeadLetter(message);
+            channel.basicAck(deliveryTag, false);
+        } catch (Exception e) {
+            log.error("reconcile seckill dead letter failed, message={}", message, e);
+            channel.basicNack(deliveryTag, false, false);
+        }
+    }
+}
+```
+
+对账失败也 **不 requeue**，依赖日志告警人工介入。
 
 ---
 
-## 十二、小结
+## 6. 场景二：购书超时关单
 
-- **Exchange 负责路由，Queue 负责存储与投递，Binding + Routing Key 决定路径**  
-- **Direct 精确、Topic 模式、Fanout 广播** —— 按场景选型  
-- **消费端用手动 Ack；失败慎用无限 requeue；死信用于隔离与补偿**  
-- **生产端 Confirm、消息持久化、消费端幂等** —— 可靠投递的三件套  
+### 6.1 链路
 
-消息队列解决的是 **异步、解耦、削峰**；它不自动保证业务正确。业务正确仍然靠：清晰的状态机、幂等、以及失败后的补偿路径。
+1. `TradeService` 创建订单落库后，`scheduleOrderTimeoutCancel`
+2. **事务提交后再发**（`TransactionSynchronization.afterCommit`），避免脏消息
+3. `TradeMqProducer` 往 `trade.delayed` 发消息，并设置 `x-delay`
+4. 到期进入 `trade.order.timeout`，`cancelOnTimeout`：仅 `PENDING_PAY` 才取消
+5. 已支付 / 已取消：直接跳过（幂等）
+6. 主消费失败 → retry / DLQ；DLQ 再失败 → `TradeOrderTimeoutFailService.recordFailure` 落库后 Ack
+
+当前设计：支付时才扣库存与核销券，超时关单 **无需回滚库存 / 券**。
+
+### 6.2 消息体
+
+`src/main/java/com/zx/bookstore/trade/dto/TradeOrderTimeoutMessage.java`
+
+```java
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TradeOrderTimeoutMessage {
+
+    private Long orderId;
+    private String orderNo;
+}
+```
+
+### 6.3 事务提交后再发
+
+`TradeService.scheduleOrderTimeoutCancel`：
+
+```java
+private void scheduleOrderTimeoutCancel(TradeOrder order) {
+    TradeOrderTimeoutMessage message =
+            new TradeOrderTimeoutMessage(order.getId(), order.getOrderNo());
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                tradeMqProducer.publishOrderTimeout(message);
+            }
+        });
+    } else {
+        tradeMqProducer.publishOrderTimeout(message);
+    }
+}
+```
+
+生产者：`src/main/java/com/zx/bookstore/trade/service/TradeMqProducer.java`
+
+```java
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class TradeMqProducer {
+
+    private final RabbitTemplate rabbitTemplate;
+    private final BookstoreTradeProperties tradeProperties;
+
+    public void publishOrderTimeout(TradeOrderTimeoutMessage message) {
+        long delayMs = tradeProperties.resolveCancelDelayMs();
+        rabbitTemplate.convertAndSend(
+                TradeMqConfig.TRADE_DELAYED_EXCHANGE,
+                TradeMqConfig.TRADE_ORDER_TIMEOUT_ROUTING_KEY,
+                message,
+                msg -> {
+                    msg.getMessageProperties().setHeader("x-delay", delayMs);
+                    return msg;
+                }
+        );
+        log.info("published trade order timeout message, orderId={}, orderNo={}, delayMs={}",
+                message.getOrderId(), message.getOrderNo(), delayMs);
+    }
+}
+```
+
+联调可把 `bookstore.trade.unpaid-cancel-delay-ms` 设为较小值（如 `60000`），不必等 15 分钟。
+
+### 6.4 超时关单业务（幂等）
+
+```java
+@Transactional
+public void cancelOnTimeout(TradeOrderTimeoutMessage message) {
+    if (message == null || message.getOrderId() == null) {
+        throw new IllegalArgumentException("超时关单消息缺少 orderId");
+    }
+    Long orderId = message.getOrderId();
+    TradeOrder order = tradeOrderRepository.findById(orderId).orElse(null);
+    if (order == null) {
+        log.warn("timeout cancel skipped: order not found, orderId={}", orderId);
+        return;
+    }
+    if (!TradeOrderStatus.PENDING_PAY.name().equals(order.getStatus())) {
+        log.info("timeout cancel skipped: orderId={}, status={}", orderId, order.getStatus());
+        return;
+    }
+    if (!tradeOrderRepository.markCancelledByTimeout(orderId)) {
+        log.info("timeout cancel race lost: orderId={}", orderId);
+        return;
+    }
+    log.info("timeout cancel success: orderId={}, orderNo={}", orderId, order.getOrderNo());
+}
+```
+
+### 6.5 主消费者
+
+`src/main/java/com/zx/bookstore/trade/consumer/TradeOrderTimeoutConsumer.java`
+
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class TradeOrderTimeoutConsumer {
+
+    private final TradeService tradeService;
+    private final MqRetrySupport mqRetrySupport;
+    private final MqQueueRetrySupport mqQueueRetrySupport;
+
+    @RabbitListener(queues = TradeMqConfig.TRADE_ORDER_TIMEOUT_QUEUE)
+    public void consume(TradeOrderTimeoutMessage message,
+                        Channel channel,
+                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag,
+                        @Header(value = MqQueueRetrySupport.RETRY_COUNT_HEADER, required = false)
+                        Integer retryCount) throws IOException {
+        try {
+            mqRetrySupport.execute("trade.order.timeout",
+                    () -> tradeService.cancelOnTimeout(message));
+            channel.basicAck(deliveryTag, false);
+        } catch (Exception e) {
+            if (mqQueueRetrySupport.tryScheduleRetry(
+                    "trade.order.timeout",
+                    message,
+                    retryCount,
+                    TradeMqConfig.TRADE_ORDER_TIMEOUT_RETRY_QUEUE,
+                    e)) {
+                channel.basicAck(deliveryTag, false);
+                return;
+            }
+            log.error("consume trade order timeout failed → dead letter, message={}, retryCount={}",
+                    message, retryCount, e);
+            channel.basicNack(deliveryTag, false, false);
+        }
+    }
+}
+```
+
+### 6.6 死信：再试关单 + 失败落库
+
+`src/main/java/com/zx/bookstore/trade/consumer/TradeOrderTimeoutDeadLetterConsumer.java`
+
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class TradeOrderTimeoutDeadLetterConsumer {
+
+    private final TradeService tradeService;
+    private final TradeOrderTimeoutFailService timeoutFailService;
+
+    @RabbitListener(queues = TradeMqConfig.TRADE_ORDER_TIMEOUT_DLQ)
+    public void consume(TradeOrderTimeoutMessage message, Channel channel,
+                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+        try {
+            tradeService.cancelOnTimeout(message);
+            channel.basicAck(deliveryTag, false);
+        } catch (Exception e) {
+            log.error("reconcile trade order timeout dead letter failed, message={} → persist fail log",
+                    message, e);
+            try {
+                timeoutFailService.recordFailure(message, e);
+                channel.basicAck(deliveryTag, false);
+            } catch (Exception persistEx) {
+                log.error("persist trade timeout fail log also failed, message={} → discard",
+                        message, persistEx);
+                channel.basicNack(deliveryTag, false, false);
+            }
+        }
+    }
+}
+```
+
+### 6.7 为何要有 `trade.timeout.reentry`
+
+Retry 队列到期后若仍回到 `trade.delayed`，会再次带上业务 `x-delay`，等于再等一整段超时时间。因此 retry 的 DLX 指向 **`trade.timeout.reentry`**，立即回到主队列再消费。
+
+---
+
+## 7. 统一重试框架
+
+配置前缀：`bookstore.mq.retry`。
+
+| 策略 | 行为 | 适用 |
+| --- | --- | --- |
+| `queue`（默认） | 失败发到 `*.retry`，设 `expiration` + header `x-bookstore-retry-count`，原消息 Ack | 生产推荐，等待在 Broker |
+| `local` | 消费线程内 `RetryTemplate` 同步退避；`MqQueueRetrySupport` 不接管 | 简单调试 |
+
+`max-attempts` **含首次消费**。例如 `3`：第 1、2 次失败可进 retry；第 3 次失败 Nack → DLQ。
+
+延迟（QUEUE，第 `n` 次进入 retry，`n` 从 1 起）：
+
+$$
+delay_n = \min(initial \times multiplier^{n-1},\ maxDelay)
+$$
+
+默认约：1s → 2s → 再失败进 DLQ。
+
+**不重试**（直接视为应进 DLQ）：异常链上存在 `BusinessException` 或 `IllegalArgumentException`。
+
+### 7.1 Broker 侧重试核心
+
+`src/main/java/com/zx/config/mq/MqQueueRetrySupport.java`
+
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class MqQueueRetrySupport {
+
+    public static final String RETRY_COUNT_HEADER = "x-bookstore-retry-count";
+
+    private final BookstoreMqRetryProperties properties;
+    private final RabbitTemplate rabbitTemplate;
+
+    public boolean tryScheduleRetry(String action,
+                                    Object payload,
+                                    Integer currentRetryCount,
+                                    String retryQueueName,
+                                    Throwable error) {
+        if (!properties.isEnabled() || properties.getStrategy() != MqRetryStrategy.QUEUE) {
+            return false;
+        }
+        if (isNonRetryable(error)) {
+            log.warn("mq queue retry skipped (non-retryable), action={}, cause={}",
+                    action, error.toString());
+            return false;
+        }
+
+        int count = currentRetryCount == null ? 0 : Math.max(0, currentRetryCount);
+        if (count + 1 >= Math.max(1, properties.getMaxAttempts())) {
+            log.warn("mq queue retry exhausted, action={}, retryCount={}, maxAttempts={}",
+                    action, count, properties.getMaxAttempts());
+            return false;
+        }
+
+        int nextCount = count + 1;
+        long delayMs = properties.resolveDelayMs(nextCount);
+        // 默认交换机 "" + 队列名：直接投递到 retry 等待队列
+        rabbitTemplate.convertAndSend("", retryQueueName, payload, message -> {
+            message.getMessageProperties().setHeader(RETRY_COUNT_HEADER, nextCount);
+            message.getMessageProperties().setExpiration(String.valueOf(delayMs));
+            return message;
+        });
+        log.warn("mq queue retry scheduled, action={}, retryCount={}/{}, delayMs={}, queue={}",
+                action, nextCount, properties.getMaxAttempts(), delayMs, retryQueueName);
+        return true;
+    }
+
+    static boolean isNonRetryable(Throwable error) {
+        Throwable cursor = error;
+        while (cursor != null) {
+            if (cursor instanceof BusinessException || cursor instanceof IllegalArgumentException) {
+                return true;
+            }
+            cursor = cursor.getCause();
+        }
+        return false;
+    }
+}
+```
+
+### 7.2 本地策略入口（仅 `strategy: local`）
+
+`src/main/java/com/zx/config/mq/MqRetrySupport.java`
+
+```java
+public void execute(String action, Runnable task) {
+    boolean useLocal = properties.isEnabled()
+            && properties.getStrategy() == MqRetryStrategy.LOCAL
+            && properties.getMaxAttempts() > 1;
+    if (!useLocal) {
+        task.run();  // QUEUE 策略：只执行一次，延迟交给 MqQueueRetrySupport
+        return;
+    }
+    // LOCAL：RetryTemplate 同步退避重试
+    AtomicInteger attempts = new AtomicInteger();
+    mqRetryTemplate.invoke(() -> {
+        int attempt = attempts.incrementAndGet();
+        if (attempt > 1) {
+            log.warn("mq local retry, action={}, attempt={}/{}",
+                    action, attempt, properties.getMaxAttempts());
+        }
+        task.run();
+    });
+}
+```
+
+更深说明见 [MQ 本地重试与 Spring Template 学习文档](./learning/MQ本地重试与Spring-Template学习文档.md)。
+
+---
+
+## 8. 工程约定（照此扩展）
+
+新增一条 MQ 链路时，建议按本仓库现有模式：
+
+1. **Config**：声明 Exchange / Queue / Binding；主队列挂业务 DLX；另建无消费者的 `*.retry` 队列，DLX 回主队列（若主入口是延迟交换机，retry 回 **reentry Direct**，不要回延迟交换机）
+2. **DTO**：字段够幂等与排查即可，避免过大 payload
+3. **Producer**：只认 Exchange + Routing Key；需要延迟时用消息头 `x-delay`；与 DB 同事务时用 **afterCommit** 再发
+4. **Consumer**：`@RabbitListener` + `Channel` + `DELIVERY_TAG`；成功 Ack；失败走 `MqQueueRetrySupport`；超次 Nack 不 requeue
+5. **DLQ Consumer**：补偿 / 对账 / 失败表；避免无限 requeue
+6. **幂等**：唯一索引、状态判断、或 idempotencyKey；默认按至少一次投递设计
+
+全局已提供的基础设施：
+
+- `RabbitTemplate` + JSON 转换器：定义在 `RabbitMqConfig`
+- 手动 ACK、`prefetch: 10`：`application.yaml`
+- 重试属性与 `RetryTemplate`：`com.zx.config.mq`
+
+---
+
+## 9. 运维与排障
+
+| 现象 | 排查 |
+| --- | --- |
+| 声明 `trade.delayed` 失败 | 未启用 `rabbitmq_delayed_message_exchange` |
+| 启动报队列参数不匹配 | 管理台删掉旧队列 / 交换机后重启 |
+| 秒杀一直 `PROCESSING` | 看 `seckill.order` 积压、Consumer 日志、发送失败是否已回滚 Redis |
+| 订单到期未取消 | 看 `trade.order.timeout` 深度、延迟插件、`x-delay` 是否生效、订单是否已非 `PENDING_PAY` |
+| 消息进了 DLQ | 秒杀：对账日志；购书：`trade_order_timeout_fail` 与管理端超时失败查询 |
+| 失败风暴占满线程 | 确认 `strategy: queue`，不要用 `local` 扛高峰 |
+
+管理台建议关注：
+
+- Queues：Ready / Unacked 深度
+- `*.retry`：应只有短暂积压（TTL 等待）
+- `*.dlq`：非空即需对账或告警
+
+---
+
+## 10. 与概念文档的分工
+
+| 文档 | 用途 |
+| --- | --- |
+| **本文** | 本仓库怎么用、拓扑、配置、扩展清单 |
+| [消息模型与投递语义](./learning/消息模型与投递语义.md) | Exchange / ACK / 至少一次等理论 |
+| [消息队列](./learning/消息队列.md) | 学习路线与能力自检 |
+| [MQ 重试文档](./learning/MQ本地重试与Spring-Template学习文档.md) | QUEUE vs LOCAL、`RetryTemplate` |
+| [P4 秒杀业务流程与技术栈](./P4秒杀业务流程与技术栈.md) | 秒杀业务全链路 |
+
+---
+
+## 11. 小结
+
+- 两条业务线：**秒杀削峰异步落库**、**购书延迟关单**
+- 失败路径统一：**有限次 Broker retry → DLQ → 对账 / 失败表**
+- 可靠业务靠：**事务后发消息、手动 ACK、幂等、死信补偿**，而不是「MQ 保证恰好一次」

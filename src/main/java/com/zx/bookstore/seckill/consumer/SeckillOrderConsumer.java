@@ -4,6 +4,8 @@ import com.rabbitmq.client.Channel;
 import com.zx.bookstore.seckill.config.RabbitMqConfig;
 import com.zx.bookstore.seckill.dto.SeckillOrderMessage;
 import com.zx.bookstore.seckill.service.SeckillService;
+import com.zx.config.mq.MqQueueRetrySupport;
+import com.zx.config.mq.MqRetrySupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -14,8 +16,10 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * 秒杀订单 MQ 消费者：手动 ACK，落库 + 发券成功后再确认消息。
- * 失败 NACK 且不 requeue，消息进入死信队列 {@code seckill.order.dlq} 做对账补偿。
+ * 秒杀订单 MQ 消费者：手动 ACK。
+ * <p>
+ * 默认 QUEUE 策略：失败则投递 {@code seckill.order.retry}（TTL）后 Ack，到期回主队列；
+ * 超次或不可重试则 Nack 进 DLQ。LOCAL 策略仍走消费线程内 {@link MqRetrySupport}。
  */
 @Slf4j
 @Component
@@ -23,17 +27,30 @@ import java.io.IOException;
 public class SeckillOrderConsumer {
 
     private final SeckillService seckillService;
+    private final MqRetrySupport mqRetrySupport;
+    private final MqQueueRetrySupport mqQueueRetrySupport;
 
     @RabbitListener(queues = RabbitMqConfig.SECKILL_ORDER_QUEUE)
-    public void consume(SeckillOrderMessage message, Channel channel,
-                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+    public void consume(SeckillOrderMessage message,
+                        Channel channel,
+                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag,
+                        @Header(value = MqQueueRetrySupport.RETRY_COUNT_HEADER, required = false) Integer retryCount)
+            throws IOException {
         try {
-            seckillService.processSeckillOrder(message);
-
+            mqRetrySupport.execute("seckill.order", () -> seckillService.processSeckillOrder(message));
             channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
-            log.error("consume seckill order failed, message={} → dead letter", message, e);
-            // requeue=false：不重回主队列，由 Broker 转发到 DLX/DLQ
+            if (mqQueueRetrySupport.tryScheduleRetry(
+                    "seckill.order",
+                    message,
+                    retryCount,
+                    RabbitMqConfig.SECKILL_ORDER_RETRY_QUEUE,
+                    e)) {
+                channel.basicAck(deliveryTag, false);
+                return;
+            }
+            log.error("consume seckill order failed → dead letter, message={}, retryCount={}",
+                    message, retryCount, e);
             channel.basicNack(deliveryTag, false, false);
         }
     }

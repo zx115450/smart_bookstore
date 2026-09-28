@@ -15,10 +15,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * 购书超时取消死信消费者：主队列失败后的兜底关单。
+ * 购书超时取消死信消费者：主队列（含 retry 耗尽）失败后的兜底关单。
  * <p>
- * 仍失败时写入 {@code trade_order_timeout_fail} 并 Ack，避免消息丢弃后无迹可查；
- * 仅当落库也失败时才 Nack 丢弃（并打错误日志）。
+ * 仍失败时写入 {@code trade_order_timeout_fail} 并 Ack；落库也失败才 Nack 丢弃。
  */
 @Slf4j
 @Component

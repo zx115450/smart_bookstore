@@ -33,7 +33,8 @@
 | 语义降级 | `ObjectProvider<SemanticBookRecaller>`，RAG 关闭时规则召回 |
 | 开关 | `ai.enabled`、`ai.rag.enabled` |
 
-建议先通读：`AiChatConfig`、`AiChatService`、`BookRecommendService`、FAQ / Book DocumentBuilder。
+建议先通读：`AiChatConfig`、`AiChatService`、`BookRecommendService`、FAQ / Book DocumentBuilder。  
+类级辞典见：[Spring AI 常用类学习文档](./SpringAI常用类学习文档.md)。
 
 ---
 

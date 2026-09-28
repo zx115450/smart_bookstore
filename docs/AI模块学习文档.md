@@ -3,7 +3,7 @@
 > **项目**：smart_bookstore（智慧书城） · **文档类型**：学习文档  
 > **关联包**：`com.zx.ai`  
 > **技术**：Spring Boot 4.1 + Spring AI 2.0 + DeepSeek（对话）+ 通义千问 Embedding + 可选 Milvus（RAG）  
-> **配套阅读**：[AI 客服技术方案](./AI客服技术方案.md) · [AI 模块分板块实施流程](./AI模块分板块实施流程.md) · [Spring AI 框架核心内容学习文档](./SpringAI框架核心内容学习文档.md) · [向量检索策略与存储单元](./向量检索策略与存储单元.md)  
+> **配套阅读**：[AI 客服技术方案](./AI客服技术方案.md) · [AI 模块分板块实施流程](./AI模块分板块实施流程.md) · [Spring AI 框架核心内容学习文档](learning/SpringAI框架核心内容学习文档.md) · [向量检索策略与存储单元](./向量检索策略与存储单元.md)  
 > **索引**：[学习文档中心](./README.md)
 
 本文面向「从零理解本项目 AI 客服」的学习路径：先建立心智模型，再对照代码走通一次对话，最后按板块深入。
@@ -48,7 +48,7 @@
 | Day 3 | 搞懂记忆 | `memory/RedisStringChatMemoryRepository`、`ai.session.*` |
 | Day 4 | 搞懂 FAQ / 推荐 | `faq/*`、`recommend/*`、`BookRecommendTool` |
 | Day 5 | 搞懂 RAG | `config/AiVectorConfig`、`rag/*`、`Semantic*Recaller`、Admin reindex |
-| Day 6 | 对照框架理论 | [SpringAI框架核心内容学习文档](./SpringAI框架核心内容学习文档.md) |
+| Day 6 | 对照框架理论 | [SpringAI框架核心内容学习文档](learning/SpringAI框架核心内容学习文档.md) |
 
 环境最小集（不做 RAG 也可学 Tool 对话）：
 
@@ -362,7 +362,7 @@ ai:
 | [AI客服技术方案](./AI客服技术方案.md) | 要写设计说明 / 方案评审 |
 | [AI模块分板块实施流程](./AI模块分板块实施流程.md) | 对照 A～H 落地清单与实现顺序 |
 | [AI客服全链路实现思路与方案学习文档](./AI客服全链路实现思路与方案学习文档.md) | 对外讲解全链路故事 |
-| [SpringAI框架核心内容学习文档](./SpringAI框架核心内容学习文档.md) | 补 Spring AI 框架层概念 |
+| [SpringAI框架核心内容学习文档](learning/SpringAI框架核心内容学习文档.md) | 补 Spring AI 框架层概念 |
 | [向量检索策略与存储单元](./向量检索策略与存储单元.md) | 深入 embedding、collection、过滤策略 |
 | [README](../README.md) | 环境启动与接口总表 |
 

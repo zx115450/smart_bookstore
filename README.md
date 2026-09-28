@@ -150,9 +150,11 @@ docker compose --profile milvus up -d
 | 服务 | 地址 | 账号 |
 | --- | --- | --- |
 | MySQL | `localhost:3306` / 库 `smart_bookstore` | `root` / `root` |
-| Redis | `localhost:6379` | 无密码 |
+| Redis | `localhost:6379` | 无密码（默认 `bookstore.redis.mode=standalone`） |
 | RabbitMQ | `localhost:5672`（管理台 `http://localhost:15672`） | `guest` / `guest` |
 | Milvus | `localhost:19530` | — |
+
+Redis 拓扑可通过 `bookstore.redis.mode`（或环境变量 `REDIS_MODE`）在 `standalone` / `master-replica` / `sentinel` / `cluster` 间切换，详见 `application.yaml` 中 `bookstore.redis` 段与 [Redis 动态拓扑接入学习文档](docs/learning/Redis动态拓扑接入学习文档.md)。
 
 库名已由 Compose 自动创建；表结构仍由应用启动时 Flyway 迁移。
 
