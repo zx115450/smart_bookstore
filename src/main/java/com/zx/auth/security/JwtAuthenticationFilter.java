@@ -35,7 +35,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/code/send",
             "/api/auth/logout",
             "/api/auth/oauth/qq/state",
-            "/api/auth/oauth/qq/callback"
+            "/api/auth/oauth/qq/callback",
+            "/api/internal/media/callback"
     );
 
     /**
@@ -94,7 +95,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 writeUnauthorized(response, ErrorCode.TOKEN_REVOKED, "token revoked");
                 return;
             }
-            //redis通过记录Session校验RefreshToken的合法性
+            //redis通过记录Session校验AccessToken的合法性
             var sessionOpt = sessionRepository.findById(claims.sessionId());
             if (sessionOpt.isEmpty() || sessionOpt.get().getRevokedAt() != null) {
                 writeUnauthorized(response, ErrorCode.SESSION_REVOKED, "session revoked or not found");
@@ -114,17 +115,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             List<String> roles = claims.roles();
+            //Auth对象
             AuthPrincipal principal = new AuthPrincipal(
                     claims.userId(),
                     claims.username(),
                     claims.sessionId(),
                     roles
             );
+            //加入上下文
             request.setAttribute(AuthAttributes.AUTH_USER, principal);
 
             var authorities = roles.stream()
                     .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                     .toList();
+            //加入security上下文
             var authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
@@ -145,5 +149,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String escapedMessage = message.replace("\\", "\\\\").replace("\"", "\\\"");
         String body = String.format("{\"code\":%d,\"message\":\"%s\",\"data\":null}", code, escapedMessage);
         response.getWriter().write(body);
+        response.flushBuffer();
     }
 }

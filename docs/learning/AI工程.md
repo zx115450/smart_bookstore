@@ -109,6 +109,7 @@ id, question, expect_tools, must_contain, must_not_contain, login_required
 - 结构化输出 / JSON mode 减少自由发挥
 - Agent 多步规划 vs 当前「单轮 Tool Calling」取舍
 - 推荐：从规则 + 共现升级到显式反馈学习（仍先做好评测）
+- 若要做「对话改代码 / 改仓库」类产品，转入 [Coding Agent 学习路线](./CodingAgent学习路线.md)
 
 ---
 
@@ -146,5 +147,6 @@ id, question, expect_tools, must_contain, must_not_contain, login_required
 
 - [后续学习路线](../后续学习路线.md)
 - [学习路线：高并发](./高并发.md)
+- [Coding Agent 学习路线](./CodingAgent学习路线.md)
 - [测试板块分步实现指南](../测试板块分步实现指南.md) T4
 - [README.md](../../README.md) AI 客服模块

@@ -1,0 +1,99 @@
+package com.zx.reader.service;
+
+import com.zx.media.client.LiteMediaClient;
+import com.zx.media.client.dto.ChapterInfo;
+import com.zx.media.client.dto.ChaptersResult;
+import com.zx.reader.ReaderException;
+import com.zx.reader.config.ReaderProperties;
+import com.zx.reader.entity.EbookBook;
+import com.zx.reader.entity.EbookChapter;
+import com.zx.reader.repository.EbookBookRepository;
+import com.zx.reader.repository.EbookChapterRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class EbookTocSyncServiceTest {
+
+    @Mock
+    private LiteMediaClient liteMediaClient;
+    @Mock
+    private EbookBookRepository ebookBookRepository;
+    @Mock
+    private EbookChapterRepository ebookChapterRepository;
+
+    private ReaderProperties readerProperties;
+    private EbookTocSyncService service;
+
+    @BeforeEach
+    void setUp() {
+        readerProperties = new ReaderProperties();
+        readerProperties.getPreview().setDefaultChapters(2);
+        service = new EbookTocSyncService(
+                liteMediaClient, ebookBookRepository, ebookChapterRepository, readerProperties);
+    }
+
+    @Test
+    void syncBySourceFileId_shouldReplaceChaptersAndMarkPreview() {
+        EbookBook book = new EbookBook();
+        book.setId(10L);
+        book.setSourceFileId("doc-1");
+        book.setPreviewChapters(2);
+        when(ebookBookRepository.findBySourceFileId("doc-1")).thenReturn(Optional.of(book));
+        when(liteMediaClient.listChapters("doc-1")).thenReturn(new ChaptersResult("doc-1", List.of(
+                new ChapterInfo(1, "一", "c1", 100, "CHAPTER"),
+                new ChapterInfo(2, "二", "c2", 200, "CHAPTER"),
+                new ChapterInfo(3, "三", "c3", 300, "CHAPTER")
+        )));
+        when(ebookChapterRepository.save(any(EbookChapter.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(ebookBookRepository.save(any(EbookBook.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        int n = service.syncBySourceFileId("doc-1");
+        assertThat(n).isEqualTo(3);
+
+        verify(ebookChapterRepository).deleteByEbookId(10L);
+        ArgumentCaptor<EbookChapter> captor = ArgumentCaptor.forClass(EbookChapter.class);
+        verify(ebookChapterRepository, times(3)).save(captor.capture());
+        assertThat(captor.getAllValues().get(0).getIsPreviewFree()).isEqualTo(1);
+        assertThat(captor.getAllValues().get(1).getIsPreviewFree()).isEqualTo(1);
+        assertThat(captor.getAllValues().get(2).getIsPreviewFree()).isEqualTo(0);
+        assertThat(book.getTotalChapters()).isEqualTo(3);
+        assertThat(book.getWordCount()).isEqualTo(600L);
+    }
+
+    @Test
+    void syncBySourceFileId_shouldReturnMinusOneWhenNoEbook() {
+        when(ebookBookRepository.findBySourceFileId("orphan")).thenReturn(Optional.empty());
+        assertThat(service.syncBySourceFileId("orphan")).isEqualTo(-1);
+        verify(liteMediaClient, never()).listChapters(any());
+    }
+
+    @Test
+    void syncBySourceFileId_shouldFailWhenChaptersEmpty() {
+        EbookBook book = new EbookBook();
+        book.setId(1L);
+        book.setSourceFileId("doc-empty");
+        when(ebookBookRepository.findBySourceFileId("doc-empty")).thenReturn(Optional.of(book));
+        when(liteMediaClient.listChapters("doc-empty"))
+                .thenReturn(new ChaptersResult("doc-empty", List.of()));
+
+        assertThatThrownBy(() -> service.syncBySourceFileId("doc-empty"))
+                .isInstanceOf(ReaderException.class);
+        verify(ebookChapterRepository, never()).deleteByEbookId(any());
+    }
+}

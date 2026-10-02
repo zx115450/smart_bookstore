@@ -58,6 +58,27 @@ class FaqToolKeywordTest {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Test
+    void shouldHitEbookPreviewRuleByKeyword() {
+        FaqTool tool = buildTool();
+
+        Map<String, Object> result = tool.searchFaq("第三章打不开是不是试看限制", 3);
+
+        assertTrue((Boolean) result.get("found"), result.toString());
+        assertEquals("keyword", result.get("source"));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Test
+    void shouldHitOverdueDowngradeByKeyword() {
+        FaqTool tool = buildTool();
+
+        Map<String, Object> result = tool.searchFaq("逾期了电子书会停权吗", 3);
+
+        assertTrue((Boolean) result.get("found"), result.toString());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Test
     void shouldReturnNotFoundForUnrelatedQuery() {
         FaqTool tool = buildTool();
 

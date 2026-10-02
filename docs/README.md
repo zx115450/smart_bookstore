@@ -17,7 +17,10 @@
 | 4. 预约与签到 | 乐观锁、行锁、BitMap | 见下方「预约与签到」 |
 | 5. 秒杀与 MQ | Lua、限流、死信 | 见下方「秒杀与消息」 |
 | 6. AI 客服 | Tool / RAG / Memory | [AI 模块学习文档](./AI模块学习文档.md) |
-| 7. 加深 | 高并发 / 缓存 / MQ / AI 工程 | [learning/](./learning/README.md) · [后续学习路线](./后续学习路线.md) |
+| 7. 阅读笔记 Agent | 试看 + 笔记 + 总结归纳 | [AI 阅读笔记模块分步实现指南](./AI阅读笔记模块分步实现指南.md) |
+| 7b. 阅读板块开工清单 | 目录 + BFF 读章 + Agent（可 Mock 媒资） | [线上阅读与学习 Agent 板块 · 阅读说明](./线上阅读与学习Agent板块/00-阅读说明.md)（B0～B6；总纲见 [分步实现指南](./线上阅读与学习Agent板块分步实现指南.md)） |
+| 8. 与媒资双仓协同 | 线上书 / 笔记 / AI / 视频媒资平台 | 工作区 [双项目协同实现方案](../../docs/双项目协同-媒资平台与智慧书城实现方案.md) |
+| 9. 加深 | 高并发 / 缓存 / MQ / AI 工程 | [learning/](./learning/README.md) · [后续学习路线](./后续学习路线.md) |
 
 ---
 
@@ -27,6 +30,7 @@
 
 | 文档 | 关联要点 |
 | --- | --- |
+| [登录鉴权实现流程](./登录鉴权实现流程.md) | **总览**：登录 → Filter 鉴权 → 刷新 → 登出 |
 | [登录流程学习文档](./登录流程学习文档.md) | `AuthController` / `AuthService` / Handler 工厂 |
 | [双 Token 登录学习文档](./双Token登录学习文档.md) | Access + Refresh、会话轮换 |
 | [JWT-Refresh-Token 完整链路](./JWT-Refresh-Token完整链路.md) | 端到端时序与表结构 |
@@ -102,7 +106,16 @@
 | [AI 客服全链路实现思路与方案学习文档](./AI客服全链路实现思路与方案学习文档.md) | 全链路串联 |
 | [Spring AI 框架核心内容学习文档](learning/SpringAI框架核心内容学习文档.md) | ChatClient / Tool / VectorStore |
 | [Spring AI 常用类学习文档](learning/SpringAI常用类学习文档.md) | 常用类职责、原理、Boot 加载机制 |
+| [Coding Agent 学习路线](learning/CodingAgent学习路线.md) | 类 Claude Code：Agent Loop / 工具集 / Diff / 流式 / 沙箱 |
 | [向量检索策略与存储单元](./向量检索策略与存储单元.md) | Embedding / Milvus |
+
+### 数字阅读与笔记 Agent（`com.zx.reader` 规划）
+
+| 文档 | 关联要点 |
+| --- | --- |
+| [AI 阅读笔记模块分步实现指南](./AI阅读笔记模块分步实现指南.md) | 电子书试看 + 笔记 + Study Agent + RAG，R0～R5（原文保留） |
+| [线上阅读与学习 Agent 板块](./线上阅读与学习Agent板块/00-阅读说明.md) | **本仓开工清单 B0～B6**；总纲见 [分步实现指南](./线上阅读与学习Agent板块分步实现指南.md) |
+| 工作区 [双项目协同实现方案](../../docs/双项目协同-媒资平台与智慧书城实现方案.md) | 与 `video` 的职责边界、端口避让、P0～P6；错误码用 51xx |
 
 ### 可观测性与测试
 
@@ -128,7 +141,7 @@
 | --- | --- |
 | [后续学习路线](./后续学习路线.md) | 项目结束后 3～6 个月计划 |
 | [后端进阶路线 - 业务 / AI / 中间件 / Netty](./后端进阶路线-业务AI与中间件Netty.md) | 进阶分轨 |
-| [加深方向学习路线](./learning/README.md) | 高并发 / 缓存 / MQ / AI 工程分册 |
+| [加深方向学习路线](./learning/README.md) | 高并发 / 缓存 / MQ / AI 工程 / Coding Agent 分册 |
 
 ---
 

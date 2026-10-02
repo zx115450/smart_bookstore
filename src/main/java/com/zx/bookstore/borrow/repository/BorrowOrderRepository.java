@@ -48,6 +48,43 @@ public class BorrowOrderRepository {
         return count != null && count > 0;
     }
 
+    /**
+     * 用户对该书是否处于借阅中或逾期未还（占额度 / 待还统计用）。
+     * <p>
+     * 线上阅读与完整视频解锁请用 {@link #hasUnlockBorrow(Long, Long)}：逾期应降级试看。
+     */
+    public boolean hasActiveBorrow(Long userId, Long bookId) {
+        if (userId == null || bookId == null) {
+            return false;
+        }
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getUserId, userId)
+                        .eq(BorrowOrder::getBookId, bookId)
+                        .in(BorrowOrder::getStatus,
+                                BorrowOrderStatus.BORROWED.name(),
+                                BorrowOrderStatus.OVERDUE.name())
+        );
+        return count != null && count > 0;
+    }
+
+    /**
+     * 是否可解锁付费章 / 完整配套视频：仅 {@code BORROWED}。
+     * {@code OVERDUE} 不解锁（归还前降级试看）；已购走交易侧判定。
+     */
+    public boolean hasUnlockBorrow(Long userId, Long bookId) {
+        if (userId == null || bookId == null) {
+            return false;
+        }
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getUserId, userId)
+                        .eq(BorrowOrder::getBookId, bookId)
+                        .eq(BorrowOrder::getStatus, BorrowOrderStatus.BORROWED.name())
+        );
+        return count != null && count > 0;
+    }
+
     public List<BorrowOrder> pageByUser(Long userId, String status, long page, long size) {
         long safePage = Math.max(1, page);
         long safeSize = Math.min(Math.max(1, size), 100);

@@ -126,6 +126,14 @@ public class TradeOrderRepository {
         return itemMapper.findHotPaidBooks(safe);
     }
 
+    /** 用户是否已购该书（存在 PAID 订单含该 book_id）。 */
+    public boolean hasPaidBook(Long userId, Long bookId) {
+        if (userId == null || bookId == null) {
+            return false;
+        }
+        return itemMapper.countPaidByUserAndBook(userId, bookId) > 0;
+    }
+
     public List<Map<String, Object>> revenueTrend(LocalDateTime start) {
         return orderMapper.revenueTrend(start);
     }

@@ -38,6 +38,8 @@ public class SecurityConfig {
                                 "/api/auth/oauth/qq/state",
                                 "/api/auth/oauth/qq/callback",
                                 "/api/ai/chat",
+                                // 媒资 Webhook：无 JWT，由 Controller 校验 X-Internal-Token
+                                "/api/internal/media/callback",
                                 // 供 VM 内 Prometheus 抓取；生产建议内网隔离或加鉴权
                                 "/actuator/health",
                                 "/actuator/info",

@@ -22,4 +22,15 @@ public interface TradeOrderItemMapper extends BaseMapper<TradeOrderItem> {
             LIMIT #{limit}
             """)
     List<Map<String, Object>> findHotPaidBooks(@Param("limit") int limit);
+
+    @Select("""
+            SELECT COUNT(1)
+            FROM trade_order_item i
+            JOIN trade_order o ON i.order_id = o.id
+            WHERE o.user_id = #{userId}
+              AND o.status = 'PAID'
+              AND i.book_id = #{bookId}
+            LIMIT 1
+            """)
+    long countPaidByUserAndBook(@Param("userId") Long userId, @Param("bookId") Long bookId);
 }

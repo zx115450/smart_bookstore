@@ -4,6 +4,7 @@ import com.zx.ai.support.ChatCardCollector;
 import com.zx.bookstore.catalog.dto.BookResponse;
 import com.zx.bookstore.catalog.dto.PageResult;
 import com.zx.bookstore.catalog.service.BookCatalogService;
+import com.zx.reader.repository.EbookBookRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -24,13 +25,14 @@ import java.util.Map;
 public class BookSearchTool {
 
     private final BookCatalogService bookCatalogService;
+    private final EbookBookRepository ebookBookRepository;
 
     /**
      * 关键词检索上架图书；命中时写入 {@link ChatCardCollector} 供前端渲染。
      */
     @Tool(
             name = "searchBooks",
-            description = "按书名、作者或关键词检索本馆上架图书，返回书目列表（含架位 shelfLocation、借阅/售卖库存）。查有没有某本书、搜书时必须先调用本工具。"
+            description = "按书名、作者或关键词检索本馆上架图书，返回书目列表（含架位 shelfLocation、借阅/售卖库存、是否有电子书 hasEbook/ebookId/previewChapters）。查有没有某本书、搜书、是否支持线上试看时必须先调用本工具。"
     )
     public Map<String, Object> searchBooks(
             @ToolParam(description = "书名、作者或关键词，例如 Redis、Java 核心技术") String keyword,
@@ -47,7 +49,7 @@ public class BookSearchTool {
         int size = limit == null ? 5 : Math.min(Math.max(limit, 1), 10);
         PageResult<BookResponse> page = bookCatalogService.listBooks(null, q, 1, size);
         List<Map<String, Object>> books = page.getRecords().stream()
-                .map(BookToolViews::from)
+                .map(this::toView)
                 .toList();
         ChatCardCollector.offerBooks(books);
 
@@ -60,5 +62,12 @@ public class BookSearchTool {
         }
         log.info("tool searchBooks keyword={} hit={}", q, books.size());
         return result;
+    }
+
+    private Map<String, Object> toView(BookResponse book) {
+        return BookToolViews.from(
+                book,
+                ebookBookRepository.findEnabledByBookId(book.getId()).orElse(null)
+        );
     }
 }

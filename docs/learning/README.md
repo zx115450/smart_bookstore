@@ -11,7 +11,7 @@
 1. 语言与运行时打底（可选）：[Java 基础复习大纲](./Java基础复习大纲.md) → [Java 程序如何运行：静态成员与类加载](./Java程序如何运行：静态成员与类加载.md) → [JVM 与内存模型](./JVM与内存模型：从运行时区域到类加载.md) → [Java 并发编程实战](./Java并发编程实战：用代码把原理跑通.md)
 2. 项目进阶主线二选一：
    - **高并发 + 缓存 + MQ**（书城 / 秒杀 / 借阅）
-   - **AI 工程**（`com.zx.ai`）
+   - **AI 工程**（`com.zx.ai`）→ 可选加深 [Coding Agent 学习路线](./CodingAgent学习路线.md)（类 Claude Code 的改代码 Agent）
 3. 中间件 / 长连接方向：先 [I/O 模型手写实现](./IO模型手写实现.md) → [计算机 I/O 模型介绍学习文档](../计算机IO模型介绍学习文档.md) → [Netty 前置基础](./Netty前置基础.md)
 4. 搜索演进（可选）：当前书目为 MySQL `LIKE`，全文检索加深见 [Elasticsearch 学习文档](./Elasticsearch学习文档.md)
 5. 数据变更捕获（可选）：[Spring Boot 使用 Binlog 学习文档](./SpringBoot-Binlog学习文档.md)（Canal / Debezium → 删缓存 / 同步 ES）
@@ -43,6 +43,7 @@
 | [消息模型与投递语义](./消息模型与投递语义.md) | Exchange / Queue、Confirm / ACK | RabbitMQ 配置与 Consumer |
 | [MQ 本地重试与 Spring Template](./MQ本地重试与Spring-Template学习文档.md) | Retry 队列（默认）/ 本地 `RetryTemplate`、`*Template` | `com.zx.config.mq` + `*.retry` 队列 |
 | [AI 工程](./AI工程.md) | Prompt / Tool 评测、RAG、成本 | `com.zx.ai` |
+| [Coding Agent 学习路线](./CodingAgent学习路线.md) | Agent Loop、读写搜改、Diff、流式 UX、沙箱权限 | 对标 Claude Code；衔接 Study Agent / Spring AI |
 | [Spring AI 常用类学习文档](./SpringAI常用类学习文档.md) | ChatClient / Advisor / Tool / Memory / VectorStore 类辞典与加载机制 | `com.zx.ai.config` 等 |
 | [Elasticsearch 学习文档](./Elasticsearch学习文档.md) | 倒排、Mapping、Query DSL、与 MySQL 同步 | 书目搜索演进（现状 `LIKE`） |
 | [Spring Boot 使用 Binlog 学习文档](./SpringBoot-Binlog学习文档.md) | CDC、Canal / Debezium、消费幂等 | 缓存失效 / ES 同步演进 |

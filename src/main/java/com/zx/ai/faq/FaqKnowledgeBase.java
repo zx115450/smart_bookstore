@@ -58,9 +58,37 @@ public final class FaqKnowledgeBase {
                 借阅到期规则：
                 - 借阅期限由 book.borrowDays 决定，默认 30 天，自管理员确认取书（APPLIED → BORROWED）起算。
                 - 系统通过 Redis ZSET + Lua 定时扫描到期订单，到期后状态自动从 BORROWED 转为 OVERDUE（逾期）。
-                - 逾期后仍可归还（OVERDUE → RETURNED），但请尽快归还以免影响后续借阅。
+                - 逾期后仍可归还（OVERDUE → RETURNED），但请尽快归还。
+                - 线上阅读与配套视频：仅 BORROWED（借阅中且未逾期）可解锁付费章与完整播放；一旦变成 OVERDUE，权限立刻降级为试看（与未借相同）。归还（RETURNED）后同样只剩试看。已购买（购书订单 PAID）不受借阅逾期影响，可永久阅读全文。
                 - 个人借阅状态请查 GET /api/borrow/orders/mine。""",
-                "到期", "逾期", "超期", "overdue", "due", "到期时间", "借阅期限", "borrowDays", "BORROWED", "OVERDUE"
+                "到期", "逾期", "超期", "overdue", "due", "到期时间", "借阅期限", "borrowDays", "BORROWED", "OVERDUE",
+                "停权", "降级试看", "看不了", "电子书锁了"
+        ));
+
+        kb.add(FaqEntry.of(
+                "线上书试看与解锁",
+                """
+                线上电子书试看与解锁规则：
+                - 实体书可绑定线上书（ebook）。目录接口 GET /api/reader/ebooks/{ebookId}/chapters；读章 GET /api/reader/ebooks/{ebookId}/chapters/{chapterNo}。
+                - 试看：前 N 章（ebook.preview_chapters，默认可为 2）标记为免费，未借未购也可读。
+                - 付费章无权限时返回业务码 5103（试看拒绝），服务端不会向媒资拉取正文。
+                - 解锁全文条件（同一 bookId）：① 借阅状态为 BORROWED（未逾期）；或 ② 购书订单已支付 PAID。待取书 APPLIED、逾期 OVERDUE、已归还 RETURNED 均不能解锁付费章。
+                - 配套视频：GET /api/books/{bookId}/media/{refId}/play；无完整权时为试看（带 previewSeconds），有完整权返回完整播放地址。
+                - 查某书是否有电子书：先 searchBooks / getBookDetail，看返回字段 hasEbook、ebookId、previewChapters。""",
+                "电子书", "线上书", "试看", "解锁", "付费章", "5103", "ebook", "ebookId", "preview",
+                "第三章打不开", "为什么锁了", "完整阅读", "配套视频", "阅读权限"
+        ));
+
+        kb.add(FaqEntry.of(
+                "学习助手与阅读笔记",
+                """
+                学习助手（Study Agent）与笔记：
+                - 学习助手入口 POST /api/reader/agent/chat（需登录），与客服 /api/ai/chat 相互独立，不共用人设。
+                - 能力：总结章节、改写/合并笔记并另存；读取章节正文前会做与读章相同的试看鉴权，锁定章不会编造正文。
+                - 笔记 CRUD：划线/手动笔记走 /api/reader/notes；总结结果 source_type 可为 AI_SUMMARY / AI_REWRITE / AI_MERGE。
+                - 客服本人不代写章节总结；若用户要总结某章，应引导其打开阅读页的学习助手，并说明需对该章有阅读权限。""",
+                "学习助手", "Study Agent", "总结章节", "改写笔记", "合并笔记", "阅读笔记", "划线",
+                "AI总结", "笔记", "agent"
         ));
 
         kb.add(FaqEntry.of(

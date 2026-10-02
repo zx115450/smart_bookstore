@@ -10,6 +10,7 @@ import com.zx.bookstore.seckill.config.SeckillRateLimitProperties;
 import com.zx.bookstore.trade.config.BookstoreTradeProperties;
 import com.zx.config.redis.BookstoreRedisProperties;
 import com.zx.marketing.checkin.config.CheckinProperties;
+import com.zx.reader.config.ReaderProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -29,7 +30,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         BookstoreTradeProperties.class,
         SeckillRateLimitProperties.class,
         AiProperties.class,
-        BookstoreRedisProperties.class
+        BookstoreRedisProperties.class,
+        ReaderProperties.class
 })
 public class SmartBookstoreApplication {
 

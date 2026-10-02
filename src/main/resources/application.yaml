@@ -246,6 +246,37 @@ bookstore:
       user-capacity: 2
       user-refill-per-second: 1
       key-ttl-seconds: 7200
+  # Lite VOD：书城只经 Client 调媒资；mock=true 不连 8080
+  # BOOKSTORE_MEDIA_TOKEN 须与 VOD_INTERNAL_TOKEN 一致
+  media:
+    lite-vod:
+      enabled: true
+      mock: true
+      base-url: ${BOOKSTORE_MEDIA_BASE_URL:http://127.0.0.1:8080}
+      internal-token: ${BOOKSTORE_MEDIA_TOKEN:}
+      connect-timeout-ms: 3000
+      read-timeout-ms: 10000
+    default-preview-seconds: 300
+
+reader:
+  enabled: true
+  preview:
+    default-chapters: 2
+  # 进度：Redis 热写 + RabbitMQ 延迟合并落库（换章即时写库）
+  progress:
+    coalesce-enabled: true
+    delay-ms: 10000
+    idle-ms: 5000
+    redis-ttl-hours: 168
+  notes:
+    max-quote-on-locked: 80
+  agent:
+    enabled: true
+    max-input-chars: 12000
+    rate-limit-per-user-hourly: 20
+    max-history-turns: 8
+    model-version: ${ai.chat-model:deepseek-chat}
+    session-ttl-minutes: 60
 
 checkin:
   frontend-base-url: ${CHECKIN_FRONTEND_URL:http://localhost:5173}

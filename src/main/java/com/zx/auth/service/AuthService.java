@@ -77,15 +77,17 @@ public class AuthService {
         }
         //确保这个登录登录对象有一个默认的Role
         roleRepo.ensureDefaultUserRole(user.getId());
-
+        //清除后端失败统计次数
         authRedisService.clearLoginFailure(loginKey);
 
         user.setLastLoginAt(LocalDateTime.now());
-
+        //更新用户登录状态
         userRepo.save(user);
 
         String auditTarget = req.getTarget() != null ? req.getTarget() : loginKey;
+        //登录日志的记录
         recordAudit(user.getId(), type, auditTarget, true, null, clientIp, userAgent);
+        //
         return createSessionAndResponse(user, req.getRememberMe(), clientIp);
     }
 
@@ -94,7 +96,17 @@ public class AuthService {
         String[] parts = refreshToken.split(":", 2);
         if (parts.length != 2) return null;
         String jti = parts[0];
-
+        //session的会话
+        /*
+            s.getRevokedAt()           → 是否已吊销
+            s.getAbsoluteExpiresAt()   → 绝对过期
+            s.getRefreshExpiresAt()    → Refresh 是否过期
+            s.getRefreshTokenHash()    → 和 sha256(明文 refresh) 比对
+            s.getUser() / getUserId()  → 签发新 Token、必要时 revokeAll
+            s.getRememberMe()          → 新会话 refresh 时长
+            s.getLoginIp()             → 带入新会话
+            s.getAbsoluteExpiresAt()   → 轮换时继承绝对过期
+         */
         Optional<AuthSession> so = sessionRepo.findByRefreshTokenJti(jti);
         if (so.isEmpty()) return null;
         AuthSession s = so.get();
@@ -108,12 +120,12 @@ public class AuthService {
         }
         if (s.getRefreshExpiresAt().isBefore(LocalDateTime.now())) return null;
         if (!s.getRefreshTokenHash().equals(sha256Hex(refreshToken))) return null;
-
+        //作废现在的
         s.setRevokedAt(LocalDateTime.now());
         sessionRepo.save(s);
 
         List<String> roles = roleRepo.findRoleCodesByUserId(s.getUser().getId());
-
+        //创建新的
         return createRotatedSession(s.getUser(), s.getRememberMe(), s.getLoginIp(), roles, s.getAbsoluteExpiresAt());
     }
 
@@ -161,7 +173,7 @@ public class AuthService {
                 rememberMe ? jwtProperties.getRefreshExpireDaysRemember() : jwtProperties.getRefreshExpireDays()
         );
         LocalDateTime refreshExp = slidingRefreshExp.isAfter(absoluteExp) ? absoluteExp : slidingRefreshExp;
-
+        //存储一个jti会话
         AuthSession s = new AuthSession();
         s.setUser(user);
         s.setRefreshTokenJti(jti);
@@ -172,7 +184,7 @@ public class AuthService {
         s.setRememberMe(rememberMe);
         s.setLoginIp(loginIp);
         sessionRepo.save(s);
-
+        //创建一个jwt
         String access = jwtService.createAccessToken(user.getId(), user.getUsername(), s.getId(), roles);
 
         LoginResponse resp = new LoginResponse();

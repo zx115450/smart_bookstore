@@ -22,7 +22,8 @@ import javax.sql.DataSource;
         "com.zx.bookstore.coupon.mapper",
         "com.zx.bookstore.trade.mapper",
         "com.zx.bookstore.seckill.mapper",
-        "com.zx.marketing.checkin.mapper"
+        "com.zx.marketing.checkin.mapper",
+        "com.zx.reader.mapper"
 }, sqlSessionTemplateRef = "sqlSessionTemplate")
 public class MybatisPlusConfig {
 

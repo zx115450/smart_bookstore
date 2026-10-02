@@ -1,93 +1,99 @@
-# 本地敏感配置模板（已加入 .gitignore 的正式文件名：application-local.yaml）
+# 本地敏感配置模板（正式文件 application-local.yaml 已 gitignore）
 #
 # 使用方法：
 #   cp src/main/resources/application-local.yaml.example src/main/resources/application-local.yaml
-# 启动时激活 local profile：
-#   mvn spring-boot:run -Dspring-boot.run.profiles=local
-#   或 IDEA Active profiles = local
+# 启动：mvn spring-boot:run -Dspring-boot.run.profiles=local
 #
-# 中间件可用 Docker 一键启动（默认账号见 docker-compose.yml）：
-#   docker compose up -d
-#   docker compose --profile milvus up -d   # 需要 RAG 时
-#
-# 也可用同名环境变量覆盖（见下方注释中的变量名）。
+# 两种常见模式（二选一）：
+#   A. 本机 docker compose（smart_bookstore/docker-compose.yml）
+#   B. 远程中间件 192.168.150.104（见 ZCODE/ops/remote-104/README.md）← 当前联调推荐
 
+# =============================================================================
+# B. 远程中间件 192.168.150.104（本机只跑书城 8081）
+# =============================================================================
 spring:
   mail:
     host: smtp.qq.com
     port: 465
-    # MAIL_USERNAME / MAIL_PASSWORD
     username: your-email@qq.com
     password: your-smtp-authorization-code
   datasource:
-    # DB_URL / DB_USERNAME / DB_PASSWORD
-    # docker compose 默认：root / root
-    url: jdbc:mysql://localhost:3306/smart_bookstore?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&allowMultiQueries=true&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048
+    url: jdbc:mysql://192.168.150.104:3306/smart_bookstore?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&allowMultiQueries=true&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048
     username: root
-    password: root
+    password: 1234
   data:
     redis:
-      host: localhost
+      host: 192.168.150.104
       port: 6379
-      # REDIS_PASSWORD；docker compose 默认无密码，留空
       password:
   rabbitmq:
-    host: localhost
+    host: 192.168.150.104
     port: 5672
-    # RABBITMQ_USERNAME / RABBITMQ_PASSWORD；docker compose 默认 guest/guest
-    username: guest
-    password: guest
-    virtual-host: /
+    username: root
+    password: 1234
+    virtual-host: bookstore
   ai:
     openai:
       chat:
-        # 或环境变量 DEEPSEEK_API_KEY
         api-key: your-deepseek-api-key
       embedding:
-        # 或环境变量 DASHSCOPE_API_KEY
         api-key: your-dashscope-api-key
+    vectorstore:
+      milvus:
+        client:
+          host: 192.168.150.104
+          port: 19530
 
-# Redis 拓扑（默认单体，与 docker compose 单节点一致）
+ai:
+  rag:
+    enabled: true
+
 bookstore:
   redis:
     mode: standalone
     password:
     standalone:
-      host: localhost
+      host: 192.168.150.104
       port: 6379
-    # 主从示例：
-    # mode: master-replica
-    # master-replica:
-    #   master-host: localhost
-    #   master-port: 6379
-    #   nodes:
-    #     - localhost:6380
-    # 哨兵示例：
-    # mode: sentinel
-    # sentinel:
-    #   master: mymaster
-    #   nodes:
-    #     - localhost:26379
-    #     - localhost:26380
-    #     - localhost:26381
-    # 分片集群示例：
-    # mode: cluster
-    # cluster:
-    #   nodes:
-    #     - redis-cluster-1:7000
-    #     - redis-cluster-2:7001
-    #     - redis-cluster-3:7002
-    #   max-redirects: 5
+  # 线上阅读板块（B 阶段）联调媒资时使用；开发期可 mock: true
+  # media:
+  #   lite-vod:
+  #     enabled: true
+  #     mock: true
+  #     base-url: http://127.0.0.1:8080
+  #     internal-token: ${BOOKSTORE_MEDIA_TOKEN:}
+  #     connect-timeout-ms: 3000
+  #     read-timeout-ms: 10000
 
 auth:
   jwt:
-    # JWT_SECRET：至少 32 字节随机串，生产必须更换
     secret: LocalDevOnlyChangeMeUseALongRandomSecretKey32B+
   oauth:
     qq:
-      # QQ_APP_ID / QQ_APP_KEY；不用 QQ 登录可留占位
       app-id: your-qq-app-id
       app-key: your-qq-app-key
       redirect-uri: http://localhost:8081/api/auth/oauth/qq/callback
       frontend-success-url: http://localhost:5173/oauth/qq/success
       frontend-error-url: http://localhost:5173/oauth/qq/error
+
+# =============================================================================
+# A. 本机 docker compose（取消注释并注释掉上方 B 段即可）
+# =============================================================================
+# spring:
+#   datasource:
+#     url: jdbc:mysql://localhost:3306/smart_bookstore?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+#     username: root
+#     password: root
+#   data:
+#     redis:
+#       host: localhost
+#       port: 6379
+#   rabbitmq:
+#     host: localhost
+#     port: 5672
+#     username: guest
+#     password: guest
+#     virtual-host: /
+# ai:
+#   rag:
+#     enabled: false   # 本机需 docker compose --profile milvus up -d 后再改 true
