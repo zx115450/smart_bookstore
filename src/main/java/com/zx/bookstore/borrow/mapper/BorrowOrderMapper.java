@@ -56,6 +56,17 @@ public interface BorrowOrderMapper extends BaseMapper<BorrowOrder> {
 
     @Update("""
             UPDATE borrow_order
+            SET status = 'BORROWED', due_at = #{dueAt}, renew_count = renew_count + 1, updated_at = NOW()
+            WHERE id = #{id}
+              AND status IN ('BORROWED', 'OVERDUE')
+              AND renew_count < #{maxRenew}
+            """)
+    int updateRenew(@Param("id") Long id,
+                    @Param("dueAt") LocalDateTime dueAt,
+                    @Param("maxRenew") int maxRenew);
+
+    @Update("""
+            UPDATE borrow_order
             SET status = 'OVERDUE', updated_at = NOW()
             WHERE status = 'BORROWED' AND due_at < NOW()
             LIMIT #{limit}

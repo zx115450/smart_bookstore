@@ -17,6 +17,10 @@ public class BorrowException extends BusinessException {
         return new BorrowException(ErrorCode.BORROW_HAS_UNRETURNED, "存在未还书籍，不可再借");
     }
 
+    public static BorrowException pendingApply() {
+        return new BorrowException(ErrorCode.BORROW_HAS_PENDING, "已有待确认的借阅申请，请先取消或等待处理");
+    }
+
     public static BorrowException invalidStatus() {
         return new BorrowException(ErrorCode.BORROW_INVALID_STATUS, "借阅单状态不允许该操作");
     }
@@ -27,5 +31,9 @@ public class BorrowException extends BusinessException {
 
     public static BorrowException forbidden() {
         return new BorrowException(ErrorCode.BORROW_FORBIDDEN, "无权操作他人借阅单");
+    }
+
+    public static BorrowException renewLimit() {
+        return new BorrowException(ErrorCode.BORROW_RENEW_LIMIT, "已达续借次数上限");
     }
 }

@@ -60,7 +60,7 @@ public class StudyAgentService {
                 : UUID.randomUUID().toString().replace("-", "");
         String conversationId = "study:user:" + userId + ":" + sessionId;
 
-        StudyAgentContext.set(userId, request.getEbookId());
+        StudyAgentContext.set(userId, request.getEbookId(), principal.roles());
         try {
             String reply = studyChatClient.prompt()
                     .user(buildUserPayload(request.getEbookId(), message))

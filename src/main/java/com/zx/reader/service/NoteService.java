@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -35,6 +36,10 @@ public class NoteService {
     private final ReaderProperties readerProperties;
 
     public NoteResponse create(Long userId, CreateNoteRequest req) {
+        return create(userId, req, null);
+    }
+
+    public NoteResponse create(Long userId, CreateNoteRequest req, Collection<String> roles) {
         if (req == null || !StringUtils.hasText(req.getContent())) {
             throw new IllegalArgumentException("content 必填");
         }
@@ -58,8 +63,10 @@ public class NoteService {
             }
         }
 
+        String content = req.getContent().trim();
         String quote = trimToNull(req.getQuoteText());
-        guardQuoteAgainstLeak(userId, book, chapter, quote);
+        guardLockedText(userId, book, chapter, roles, content, contentLimit(), ReaderException.noteContentDenied());
+        guardLockedText(userId, book, chapter, roles, quote, quoteLimit(), ReaderException.noteQuoteDenied());
 
         String sourceType = resolveCreateSourceType(req.getSourceType(), quote);
 
@@ -71,7 +78,7 @@ public class NoteService {
         note.setFileId(trimToNull(req.getFileId()));
         note.setSourceType(sourceType);
         note.setTitle(trimToNull(req.getTitle()));
-        note.setContent(req.getContent().trim());
+        note.setContent(content);
         note.setQuoteText(quote);
         note.setTags(trimToNull(req.getTags()));
         return toResponse(userNoteRepository.save(note));
@@ -88,16 +95,27 @@ public class NoteService {
     }
 
     public NoteResponse update(Long userId, Long noteId, UpdateNoteRequest req) {
+        return update(userId, noteId, req, null);
+    }
+
+    public NoteResponse update(Long userId, Long noteId, UpdateNoteRequest req, Collection<String> roles) {
         if (req == null) {
             throw new IllegalArgumentException("body 必填");
         }
         UserNote note = requireOwned(userId, noteId);
 
+        EbookBook book = note.getEbookId() == null ? null
+                : ebookBookRepository.findById(note.getEbookId()).orElse(null);
+        EbookChapter chapter = note.getChapterId() == null ? null
+                : ebookChapterRepository.findById(note.getChapterId()).orElse(null);
+
         if (req.getContent() != null) {
             if (!StringUtils.hasText(req.getContent())) {
                 throw new IllegalArgumentException("content 不能为空");
             }
-            note.setContent(req.getContent().trim());
+            String content = req.getContent().trim();
+            guardLockedText(userId, book, chapter, roles, content, contentLimit(), ReaderException.noteContentDenied());
+            note.setContent(content);
         }
         if (req.getTitle() != null) {
             note.setTitle(trimToNull(req.getTitle()));
@@ -107,11 +125,7 @@ public class NoteService {
         }
         if (req.getQuoteText() != null) {
             String quote = trimToNull(req.getQuoteText());
-            EbookBook book = note.getEbookId() == null ? null
-                    : ebookBookRepository.findById(note.getEbookId()).orElse(null);
-            EbookChapter chapter = note.getChapterId() == null ? null
-                    : ebookChapterRepository.findById(note.getChapterId()).orElse(null);
-            guardQuoteAgainstLeak(userId, book, chapter, quote);
+            guardLockedText(userId, book, chapter, roles, quote, quoteLimit(), ReaderException.noteQuoteDenied());
             note.setQuoteText(quote);
             if (quote != null && "MANUAL".equals(note.getSourceType())) {
                 note.setSourceType("HIGHLIGHT");
@@ -130,6 +144,12 @@ public class NoteService {
      */
     public NoteResponse saveAiNote(Long userId, Long ebookId, Long chapterId,
                                    String sourceType, String title, String content) {
+        return saveAiNote(userId, ebookId, chapterId, sourceType, title, content, null);
+    }
+
+    public NoteResponse saveAiNote(Long userId, Long ebookId, Long chapterId,
+                                   String sourceType, String title, String content,
+                                   Collection<String> roles) {
         if (!StringUtils.hasText(content)) {
             throw new IllegalArgumentException("content 必填");
         }
@@ -137,40 +157,56 @@ public class NoteService {
         if (!AI_SOURCE_TYPES.contains(type)) {
             throw new IllegalArgumentException("非法 AI sourceType: " + sourceType);
         }
+        EbookBook book = null;
         if (ebookId != null) {
-            ebookBookRepository.findById(ebookId).orElseThrow(ReaderException::ebookNotFound);
+            book = ebookBookRepository.findById(ebookId).orElseThrow(ReaderException::ebookNotFound);
         }
+        EbookChapter chapter = null;
         if (chapterId != null) {
-            EbookChapter chapter = ebookChapterRepository.findById(chapterId)
+            chapter = ebookChapterRepository.findById(chapterId)
                     .orElseThrow(ReaderException::ebookNotFound);
             if (ebookId != null && !ebookId.equals(chapter.getEbookId())) {
                 throw ReaderException.ebookNotFound();
             }
             if (ebookId == null) {
                 ebookId = chapter.getEbookId();
+                book = ebookBookRepository.findById(ebookId).orElseThrow(ReaderException::ebookNotFound);
             }
         }
+        String stored = content.trim();
+        guardLockedText(userId, book, chapter, roles, stored, contentLimit(), ReaderException.noteContentDenied());
         UserNote note = new UserNote();
         note.setUserId(userId);
         note.setEbookId(ebookId);
         note.setChapterId(chapterId);
         note.setSourceType(type);
         note.setTitle(trimToNull(title));
-        note.setContent(content.trim());
+        note.setContent(stored);
         return toResponse(userNoteRepository.save(note));
     }
 
-    private void guardQuoteAgainstLeak(Long userId, EbookBook book, EbookChapter chapter, String quote) {
-        if (quote == null || chapter == null || book == null) {
+    /**
+     * 锁定章分别限制划线与笔记正文，避免把章节原文整段存进笔记。
+     */
+    private void guardLockedText(Long userId, EbookBook book, EbookChapter chapter,
+                                 Collection<String> roles, String text, int max, ReaderException denied) {
+        if (text == null || chapter == null || book == null) {
             return;
         }
-        int max = Math.max(0, readerProperties.getNotes().getMaxQuoteOnLocked());
-        if (quote.length() <= max) {
+        if (text.length() <= Math.max(0, max)) {
             return;
         }
-        if (!chapterAccessService.canReadChapter(userId, book, chapter)) {
-            throw ReaderException.noteQuoteDenied();
+        if (!chapterAccessService.canReadChapter(userId, book, chapter, roles)) {
+            throw denied;
         }
+    }
+
+    private int quoteLimit() {
+        return readerProperties.getNotes().getMaxQuoteOnLocked();
+    }
+
+    private int contentLimit() {
+        return readerProperties.getNotes().getMaxContentOnLocked();
     }
 
     private UserNote requireOwned(Long userId, Long noteId) {

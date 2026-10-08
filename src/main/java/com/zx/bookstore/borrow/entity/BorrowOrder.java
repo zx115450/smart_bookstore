@@ -37,6 +37,9 @@ public class BorrowOrder {
     @TableField("created_at")
     private LocalDateTime createdAt;
 
+    @TableField("renew_count")
+    private Integer renewCount = 0;
+
     @TableField("updated_at")
     private LocalDateTime updatedAt;
 
@@ -58,6 +61,8 @@ public class BorrowOrder {
     public void setReturnAt(LocalDateTime returnAt) { this.returnAt = returnAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Integer getRenewCount() { return renewCount; }
+    public void setRenewCount(Integer renewCount) { this.renewCount = renewCount; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

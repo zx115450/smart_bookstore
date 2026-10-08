@@ -3,10 +3,13 @@ package com.zx.reader.service;
 import com.zx.common.exception.ErrorCode;
 import com.zx.media.client.LiteMediaClient;
 import com.zx.reader.ReaderException;
+import com.zx.reader.config.ReaderProperties;
 import com.zx.reader.dto.ChapterContentResponse;
 import com.zx.reader.dto.ChapterTocItemResponse;
 import com.zx.reader.entity.EbookBook;
 import com.zx.reader.entity.EbookChapter;
+import com.zx.bookstore.borrow.repository.BorrowOrderRepository;
+import com.zx.bookstore.trade.repository.TradeOrderRepository;
 import com.zx.reader.repository.EbookBookRepository;
 import com.zx.reader.repository.EbookChapterRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,18 +38,21 @@ class EbookReaderServiceTest {
     private EbookChapterRepository ebookChapterRepository;
     @Mock
     private LiteMediaClient liteMediaClient;
+    @Mock
+    private BorrowOrderRepository borrowOrderRepository;
+    @Mock
+    private TradeOrderRepository tradeOrderRepository;
 
-    private ChapterAccessService chapterAccessService;
     private EbookReaderService service;
 
     @BeforeEach
     void setUp() {
-        MediaAccessService mediaAccessService = new MediaAccessService(
-                org.mockito.Mockito.mock(com.zx.bookstore.borrow.repository.BorrowOrderRepository.class),
-                org.mockito.Mockito.mock(com.zx.bookstore.trade.repository.TradeOrderRepository.class));
-        chapterAccessService = new ChapterAccessService(mediaAccessService);
+        MediaAccessService mediaAccessService = new MediaAccessService(borrowOrderRepository, tradeOrderRepository);
+        ChapterAccessService chapterAccessService = new ChapterAccessService(mediaAccessService);
+        ReaderProperties properties = new ReaderProperties();
         service = new EbookReaderService(
-                ebookBookRepository, ebookChapterRepository, chapterAccessService, liteMediaClient);
+                ebookBookRepository, ebookChapterRepository, chapterAccessService,
+                new ChapterTextCache(liteMediaClient, properties));
     }
 
     @Test
@@ -64,6 +71,8 @@ class EbookReaderServiceTest {
         assertThat(toc.get(0).isLocked()).isFalse();
         assertThat(toc.get(1).isLocked()).isFalse();
         assertThat(toc.get(2).isLocked()).isTrue();
+        assertThat(toc).allSatisfy(item -> assertThat(item.isBookBound()).isTrue());
+        verify(borrowOrderRepository, org.mockito.Mockito.times(1)).hasUnlockBorrow(1L, 99L);
         assertThat(toc).allSatisfy(item -> {
             // 反射不到 fileId 字段；确保响应类型本身不含敏感字段即可
             assertThat(item.getChapterNo()).isNotNull();
@@ -86,6 +95,9 @@ class EbookReaderServiceTest {
         assertThat(resp.getTitle()).isEqualTo("持久化");
         assertThat(resp.getContent()).isEqualTo("# 第1章");
         verify(liteMediaClient).fetchObjectText("mock-c-1");
+
+        service.getChapterContent(1L, 10L, 1);
+        verify(liteMediaClient, times(1)).fetchObjectText("mock-c-1");
     }
 
     @Test
@@ -149,6 +161,7 @@ class EbookReaderServiceTest {
     private static EbookBook onlineBook(Long id) {
         EbookBook book = new EbookBook();
         book.setId(id);
+        book.setBookId(99L);
         book.setTitle("Redis");
         book.setStatus(1);
         return book;

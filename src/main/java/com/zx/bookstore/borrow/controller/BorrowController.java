@@ -37,6 +37,15 @@ public class BorrowController {
     }
 
     @PreAuthorize("hasRole('USER')")
+    @PostMapping("/orders/{id}/renew")
+    public ApiResponse<BorrowOrderResponse> renew(
+            @RequestAttribute(AuthAttributes.AUTH_USER) AuthPrincipal principal,
+            @PathVariable Long id
+    ) {
+        return ApiResponse.ok(borrowService.renew(principal, id));
+    }
+
+    @PreAuthorize("hasRole('USER')")
     @PostMapping("/orders/{id}/return")
     public ApiResponse<BorrowOrderResponse> returnBook(
             @RequestAttribute(AuthAttributes.AUTH_USER) AuthPrincipal principal,

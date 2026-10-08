@@ -38,7 +38,7 @@ public class ReaderNoteController {
             @RequestAttribute(AuthAttributes.AUTH_USER) AuthPrincipal principal,
             @RequestBody CreateNoteRequest request
     ) {
-        return ApiResponse.ok(noteService.create(principal.userId(), request));
+        return ApiResponse.ok(noteService.create(principal.userId(), request, principal.roles()));
     }
 
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
@@ -66,7 +66,7 @@ public class ReaderNoteController {
             @PathVariable Long noteId,
             @RequestBody UpdateNoteRequest request
     ) {
-        return ApiResponse.ok(noteService.update(principal.userId(), noteId, request));
+        return ApiResponse.ok(noteService.update(principal.userId(), noteId, request, principal.roles()));
     }
 
     @PreAuthorize("hasAnyRole('USER','ADMIN')")

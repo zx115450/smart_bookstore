@@ -42,6 +42,10 @@ public class ReaderProperties {
     public static class Preview {
         /** 导入同步 TOC 时前 N 章标记试看免费。 */
         private int defaultChapters = 2;
+        /** 章节正文缓存条数。 */
+        private int chapterCacheSize = 200;
+        /** 章节正文缓存分钟数。 */
+        private int chapterCacheMinutes = 30;
 
         public int getDefaultChapters() {
             return defaultChapters;
@@ -49,6 +53,22 @@ public class ReaderProperties {
 
         public void setDefaultChapters(int defaultChapters) {
             this.defaultChapters = defaultChapters;
+        }
+
+        public int getChapterCacheSize() {
+            return chapterCacheSize;
+        }
+
+        public void setChapterCacheSize(int chapterCacheSize) {
+            this.chapterCacheSize = chapterCacheSize;
+        }
+
+        public int getChapterCacheMinutes() {
+            return chapterCacheMinutes;
+        }
+
+        public void setChapterCacheMinutes(int chapterCacheMinutes) {
+            this.chapterCacheMinutes = chapterCacheMinutes;
         }
     }
 
@@ -106,6 +126,8 @@ public class ReaderProperties {
     public static class Notes {
         /** 锁定章允许的最大划线长度；超出拒绝（防泄文）。 */
         private int maxQuoteOnLocked = 80;
+        /** 锁定章允许的笔记正文长度。划线仍用更短的上限，避免试看时写不了自己的笔记。 */
+        private int maxContentOnLocked = 2000;
 
         public int getMaxQuoteOnLocked() {
             return maxQuoteOnLocked;
@@ -113,6 +135,14 @@ public class ReaderProperties {
 
         public void setMaxQuoteOnLocked(int maxQuoteOnLocked) {
             this.maxQuoteOnLocked = maxQuoteOnLocked;
+        }
+
+        public int getMaxContentOnLocked() {
+            return maxContentOnLocked;
+        }
+
+        public void setMaxContentOnLocked(int maxContentOnLocked) {
+            this.maxContentOnLocked = maxContentOnLocked;
         }
     }
 

@@ -8,8 +8,11 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -22,6 +25,15 @@ public class BookRepository {
             return Optional.empty();
         }
         return Optional.ofNullable(mapper.selectById(id));
+    }
+
+    public Map<Long, Book> findByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        return mapper.selectList(
+                Wrappers.<Book>lambdaQuery().in(Book::getId, ids)
+        ).stream().collect(Collectors.toMap(Book::getId, book -> book, (left, right) -> left));
     }
 
     public Optional<Book> findEnabledById(Long id) {

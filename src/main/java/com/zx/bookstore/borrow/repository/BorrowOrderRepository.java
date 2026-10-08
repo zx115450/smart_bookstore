@@ -25,6 +25,21 @@ public class BorrowOrderRepository {
         return Optional.ofNullable(mapper.selectById(id));
     }
 
+    /**
+     * 尚未确认借出的申请单。确认借出时已扣 {@code borrowStock}，不能再算进可借占用。
+     */
+    public long countAppliedByBookId(Long bookId) {
+        if (bookId == null) {
+            return 0;
+        }
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getBookId, bookId)
+                        .eq(BorrowOrder::getStatus, BorrowOrderStatus.APPLIED.name())
+        );
+        return count == null ? 0 : count;
+    }
+
     public long countOccupiedByBookId(Long bookId) {
         Long count = mapper.selectCount(
                 Wrappers.<BorrowOrder>lambdaQuery()
@@ -35,6 +50,18 @@ public class BorrowOrderRepository {
                                 BorrowOrderStatus.OVERDUE.name())
         );
         return count == null ? 0 : count;
+    }
+
+    public boolean hasPendingApplyByUser(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getUserId, userId)
+                        .eq(BorrowOrder::getStatus, BorrowOrderStatus.APPLIED.name())
+        );
+        return count != null && count > 0;
     }
 
     public boolean hasActiveBorrowByUser(Long userId) {
@@ -157,6 +184,10 @@ public class BorrowOrderRepository {
 
     public int updateToOverdue(Long id) {
         return mapper.updateToOverdue(id);
+    }
+
+    public int updateRenew(Long id, LocalDateTime dueAt, int maxRenew) {
+        return mapper.updateRenew(id, dueAt, maxRenew);
     }
 
     public int updateOverdueBatch(int limit) {

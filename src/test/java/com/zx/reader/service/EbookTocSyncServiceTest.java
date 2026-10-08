@@ -53,6 +53,7 @@ class EbookTocSyncServiceTest {
         EbookBook book = new EbookBook();
         book.setId(10L);
         book.setSourceFileId("doc-1");
+        book.setBookId(8L);
         book.setPreviewChapters(2);
         when(ebookBookRepository.findBySourceFileId("doc-1")).thenReturn(Optional.of(book));
         when(liteMediaClient.listChapters("doc-1")).thenReturn(new ChaptersResult("doc-1", List.of(
@@ -88,12 +89,26 @@ class EbookTocSyncServiceTest {
         EbookBook book = new EbookBook();
         book.setId(1L);
         book.setSourceFileId("doc-empty");
+        book.setBookId(8L);
         when(ebookBookRepository.findBySourceFileId("doc-empty")).thenReturn(Optional.of(book));
         when(liteMediaClient.listChapters("doc-empty"))
                 .thenReturn(new ChaptersResult("doc-empty", List.of()));
 
         assertThatThrownBy(() -> service.syncBySourceFileId("doc-empty"))
                 .isInstanceOf(ReaderException.class);
+        verify(ebookChapterRepository, never()).deleteByEbookId(any());
+    }
+
+    @Test
+    void syncBySourceFileId_shouldRefuseWhenBookNotBound() {
+        EbookBook book = new EbookBook();
+        book.setId(4L);
+        book.setSourceFileId("doc-unbound");
+        when(ebookBookRepository.findBySourceFileId("doc-unbound")).thenReturn(Optional.of(book));
+
+        assertThatThrownBy(() -> service.syncBySourceFileId("doc-unbound"))
+                .isInstanceOf(ReaderException.class);
+        verify(liteMediaClient, never()).listChapters(any());
         verify(ebookChapterRepository, never()).deleteByEbookId(any());
     }
 }

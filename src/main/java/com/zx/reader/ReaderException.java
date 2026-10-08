@@ -20,12 +20,20 @@ public class ReaderException extends BusinessException {
         return new ReaderException(ErrorCode.READER_PREVIEW_DENIED, "本章需借阅或购买后阅读");
     }
 
+    public static ReaderException ebookNotBound() {
+        return new ReaderException(ErrorCode.READER_EBOOK_NOT_BOUND, "电子书未关联实体书，无法同步目录");
+    }
+
     public static ReaderException noteForbidden() {
         return new ReaderException(ErrorCode.READER_NOTE_FORBIDDEN, "无权操作该笔记");
     }
 
     public static ReaderException noteQuoteDenied() {
         return new ReaderException(ErrorCode.READER_NOTE_QUOTE_DENIED, "锁定章节划线过长，无法保存");
+    }
+
+    public static ReaderException noteContentDenied() {
+        return new ReaderException(ErrorCode.READER_NOTE_QUOTE_DENIED, "锁定章节笔记过长，无法保存");
     }
 
     public static ReaderException noteNotFound() {

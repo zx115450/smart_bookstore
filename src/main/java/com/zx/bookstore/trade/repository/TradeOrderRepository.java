@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,6 +63,15 @@ public class TradeOrderRepository {
     public List<TradeOrderItem> findItemsByOrderId(Long orderId) {
         return itemMapper.selectList(
                 Wrappers.<TradeOrderItem>lambdaQuery().eq(TradeOrderItem::getOrderId, orderId)
+        );
+    }
+
+    public List<TradeOrderItem> findItemsByOrderIds(Collection<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            return List.of();
+        }
+        return itemMapper.selectList(
+                Wrappers.<TradeOrderItem>lambdaQuery().in(TradeOrderItem::getOrderId, orderIds)
         );
     }
 

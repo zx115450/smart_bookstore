@@ -87,6 +87,33 @@ class NoteServiceTest {
     }
 
     @Test
+    void lockedChapter_longContent_shouldDeny() {
+        stubBookAndLockedChapter();
+        CreateNoteRequest req = new CreateNoteRequest();
+        req.setEbookId(10L);
+        req.setChapterId(103L);
+        req.setContent("x".repeat(2001));
+
+        assertThatThrownBy(() -> service.create(1L, req))
+                .isInstanceOf(ReaderException.class)
+                .satisfies(ex -> assertThat(((ReaderException) ex).getCode())
+                        .isEqualTo(ErrorCode.READER_NOTE_QUOTE_DENIED));
+    }
+
+    @Test
+    void lockedChapter_mediumContent_shouldAllow() {
+        stubBookAndLockedChapter();
+        when(userNoteRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        CreateNoteRequest req = new CreateNoteRequest();
+        req.setEbookId(10L);
+        req.setChapterId(103L);
+        req.setContent("x".repeat(100));
+
+        NoteResponse resp = service.create(1L, req);
+        assertThat(resp.getContent()).hasSize(100);
+    }
+
+    @Test
     void lockedChapter_shortQuote_shouldAllow() {
         stubBookAndLockedChapter();
         when(userNoteRepository.save(any())).thenAnswer(inv -> {

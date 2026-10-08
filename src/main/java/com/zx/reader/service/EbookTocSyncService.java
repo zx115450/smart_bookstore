@@ -60,6 +60,9 @@ public class EbookTocSyncService {
     }
 
     private int syncEbook(EbookBook book) {
+        if (book.getBookId() == null) {
+            throw ReaderException.ebookNotBound();
+        }
         ChaptersResult result = liteMediaClient.listChapters(book.getSourceFileId());
         List<ChapterInfo> chapters = result == null || result.chapters() == null
                 ? List.of()

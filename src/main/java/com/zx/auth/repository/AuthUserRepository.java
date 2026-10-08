@@ -8,7 +8,10 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -29,6 +32,15 @@ public class AuthUserRepository {
             return Optional.empty();
         }
         return Optional.ofNullable(mapper.selectById(id));
+    }
+
+    public Map<Long, AuthUser> findByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        return mapper.selectList(
+                Wrappers.<AuthUser>lambdaQuery().in(AuthUser::getId, ids)
+        ).stream().collect(Collectors.toMap(AuthUser::getId, user -> user, (left, right) -> left));
     }
 
     public Optional<AuthUser> findByIdForUpdate(Long id) {

@@ -91,6 +91,10 @@ public final class ErrorCode {
     public static final int BORROW_INVALID_STATUS = 4102;
     public static final int BORROW_ORDER_NOT_FOUND = 4103;
     public static final int BORROW_FORBIDDEN = 4104;
+    /** 续借次数已用完 */
+    public static final int BORROW_RENEW_LIMIT = 4105;
+    /** 已有待确认的借阅申请 */
+    public static final int BORROW_HAS_PENDING = 4106;
 
     // 购物车：4200~4299
     public static final int CART_ITEM_NOT_FOUND = 4200;
@@ -138,6 +142,8 @@ public final class ErrorCode {
     public static final int READER_EBOOK_NOT_FOUND = 5101;
     /** 试看拒绝（未解锁章，禁止调媒资拉正文） */
     public static final int READER_PREVIEW_DENIED = 5103;
+    /** 电子书未关联实体书，付费章无法按借阅/购买解锁 */
+    public static final int READER_EBOOK_NOT_BOUND = 5104;
 
     // 阅读笔记：5201~5299
     public static final int READER_NOTE_FORBIDDEN = 5201;

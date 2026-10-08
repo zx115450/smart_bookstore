@@ -30,6 +30,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -207,10 +210,8 @@ public class TradeService {
     public PageResult<TradeOrderResponse> listMyOrders(AuthPrincipal principal, String status, long page, long size) {
         long safePage = Math.max(1, page);
         long safeSize = Math.min(Math.max(1, size), 100);
-        List<TradeOrderResponse> records = tradeOrderRepository.pageByUser(principal.userId(), status, safePage, safeSize)
-                .stream()
-                .map(this::buildResponse)
-                .collect(Collectors.toList());
+        List<TradeOrderResponse> records = toResponses(
+                tradeOrderRepository.pageByUser(principal.userId(), status, safePage, safeSize), false);
         long total = tradeOrderRepository.countByUser(principal.userId(), status);
         return new PageResult<>(safePage, safeSize, total, records);
     }
@@ -218,10 +219,8 @@ public class TradeService {
     public PageResult<TradeOrderResponse> listAllOrders(String status, long page, long size) {
         long safePage = Math.max(1, page);
         long safeSize = Math.min(Math.max(1, size), 100);
-        List<TradeOrderResponse> records = tradeOrderRepository.pageAll(status, safePage, safeSize)
-                .stream()
-                .map(this::buildAdminResponse)
-                .collect(Collectors.toList());
+        List<TradeOrderResponse> records = toResponses(
+                tradeOrderRepository.pageAll(status, safePage, safeSize), true);
         long total = tradeOrderRepository.countAll(status);
         return new PageResult<>(safePage, safeSize, total, records);
     }
@@ -251,6 +250,34 @@ public class TradeService {
         return new OrderLine(book.getId(), book.getTitle(), book.getPrice(), quantity);
     }
 
+    private List<TradeOrderResponse> toResponses(List<TradeOrder> orders, boolean withUser) {
+        if (orders == null || orders.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> orderIds = orders.stream().map(TradeOrder::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, List<TradeOrderItem>> itemsByOrder = tradeOrderRepository.findItemsByOrderIds(orderIds).stream()
+                .collect(Collectors.groupingBy(TradeOrderItem::getOrderId));
+        Map<Long, com.zx.auth.entity.AuthUser> users = Map.of();
+        if (withUser) {
+            Set<Long> userIds = orders.stream().map(TradeOrder::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
+            users = authUserRepository.findByIds(userIds);
+        }
+        Map<Long, com.zx.auth.entity.AuthUser> userMap = users;
+        return orders.stream().map(order -> {
+            com.zx.auth.entity.AuthUser user = order.getUserId() == null ? null : userMap.get(order.getUserId());
+            return fillResponse(order, itemsByOrder.getOrDefault(order.getId(), List.of()), user);
+        }).toList();
+    }
+
+    private TradeOrderResponse fillResponse(TradeOrder order, List<TradeOrderItem> items,
+                                            com.zx.auth.entity.AuthUser user) {
+        TradeOrderResponse resp = buildResponse(order, items);
+        if (user != null) {
+            resp.setUsername(user.getUsername());
+        }
+        return resp;
+    }
+
     private TradeOrderResponse buildResponse(TradeOrder order) {
         TradeOrderResponse resp = new TradeOrderResponse();
         resp.setId(order.getId());
@@ -266,6 +293,21 @@ public class TradeService {
         return resp;
     }
 
+    private TradeOrderResponse buildResponse(TradeOrder order, List<TradeOrderItem> items) {
+        TradeOrderResponse resp = new TradeOrderResponse();
+        resp.setId(order.getId());
+        resp.setOrderNo(order.getOrderNo());
+        resp.setUserId(order.getUserId());
+        resp.setTotalAmount(order.getTotalAmount());
+        resp.setDiscountAmount(order.getDiscountAmount());
+        resp.setPayAmount(order.getPayAmount());
+        resp.setCouponId(order.getCouponId());
+        resp.setStatus(order.getStatus());
+        resp.setPaidAt(format(order.getPaidAt()));
+        resp.setItems(toItemResponses(items));
+        return resp;
+    }
+
     private TradeOrderResponse buildAdminResponse(TradeOrder order) {
         TradeOrderResponse resp = buildResponse(order);
         authUserRepository.findById(order.getUserId())
@@ -274,8 +316,11 @@ public class TradeService {
     }
 
     private List<TradeOrderResponse.TradeOrderItemResponse> buildItemResponses(Long orderId) {
-        return tradeOrderRepository.findItemsByOrderId(orderId)
-                .stream()
+        return toItemResponses(tradeOrderRepository.findItemsByOrderId(orderId));
+    }
+
+    private List<TradeOrderResponse.TradeOrderItemResponse> toItemResponses(List<TradeOrderItem> items) {
+        return items.stream()
                 .map(item -> {
                     TradeOrderResponse.TradeOrderItemResponse ir = new TradeOrderResponse.TradeOrderItemResponse();
                     ir.setBookId(item.getBookId());

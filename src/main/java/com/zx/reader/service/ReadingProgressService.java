@@ -18,10 +18,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collection;
 
 /**
  * 阅读进度：Redis 热写 + RabbitMQ 延迟合并落库。
@@ -56,12 +59,18 @@ public class ReadingProgressService {
     }
 
     public ReadingProgressResponse updateProgress(Long userId, Long ebookId, UpdateProgressRequest req) {
+        return updateProgress(userId, ebookId, req, null);
+    }
+
+    @Transactional
+    public ReadingProgressResponse updateProgress(Long userId, Long ebookId, UpdateProgressRequest req,
+                                                  Collection<String> roles) {
         if (req == null || req.getCharOffset() == null) {
             throw new IllegalArgumentException("charOffset 必填");
         }
         EbookBook book = requireOnlineEbook(ebookId);
         EbookChapter chapter = resolveChapter(ebookId, req);
-        if (!chapterAccessService.canReadChapter(userId, book, chapter)) {
+        if (!chapterAccessService.canReadChapter(userId, book, chapter, roles)) {
             throw ReaderException.previewDenied();
         }
 
@@ -81,7 +90,7 @@ public class ReadingProgressService {
         if (!readerProperties.getProgress().isCoalesceEnabled()) {
             persist(userId, ebookId, newChapterId, offset);
             progressRedisStore.touchAndMarkDirty(userId, ebookId, newChapterId, offset, now);
-            progressRedisStore.markClean(userId, ebookId);
+            markCleanAfterCommit(userId, ebookId);
             return toResponse(ebookId, newChapterId, offset, LocalDateTime.now());
         }
 
@@ -89,7 +98,7 @@ public class ReadingProgressService {
         if (chapterChanged || firstProgress) {
             persist(userId, ebookId, newChapterId, offset);
             progressRedisStore.touchAndMarkDirty(userId, ebookId, newChapterId, offset, now);
-            progressRedisStore.markClean(userId, ebookId);
+            markCleanAfterCommit(userId, ebookId);
             return toResponse(ebookId, newChapterId, offset, LocalDateTime.now());
         }
 
@@ -105,7 +114,9 @@ public class ReadingProgressService {
 
     /**
      * 延迟消息到期：若仍活跃则再延后；否则 Redis → MySQL。
+     * 事务标在本方法上，避免同类自调用 {@code persist} 时注解失效。
      */
+    @Transactional
     public void onFlushDue(ProgressFlushMessage message) {
         if (message == null || message.getUserId() == null || message.getEbookId() == null) {
             return;
@@ -130,13 +141,25 @@ public class ReadingProgressService {
         }
 
         persist(userId, ebookId, hot.chapterId(), hot.charOffset());
-        progressRedisStore.markClean(userId, ebookId);
+        markCleanAfterCommit(userId, ebookId);
         log.info("progress flushed userId={} ebookId={} chapterId={} offset={}",
                 userId, ebookId, hot.chapterId(), hot.charOffset());
     }
 
-    @Transactional
-    protected void persist(Long userId, Long ebookId, Long chapterId, int charOffset) {
+    private void markCleanAfterCommit(Long userId, Long ebookId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    progressRedisStore.markClean(userId, ebookId);
+                }
+            });
+            return;
+        }
+        progressRedisStore.markClean(userId, ebookId);
+    }
+
+    private void persist(Long userId, Long ebookId, Long chapterId, int charOffset) {
         EbookReadingProgress row = progressRepository.findByUserAndEbook(userId, ebookId)
                 .orElseGet(() -> {
                     EbookReadingProgress p = new EbookReadingProgress();

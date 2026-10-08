@@ -10,6 +10,8 @@ public class ChapterTocItemResponse {
     private Integer wordCount;
     /** true = 需借阅/购买后可读 */
     private boolean locked;
+    /** false = 电子书未关联实体书，付费章无法按借阅或购买解锁 */
+    private boolean bookBound;
 
     public Integer getChapterNo() {
         return chapterNo;
@@ -41,5 +43,13 @@ public class ChapterTocItemResponse {
 
     public void setLocked(boolean locked) {
         this.locked = locked;
+    }
+
+    public boolean isBookBound() {
+        return bookBound;
+    }
+
+    public void setBookBound(boolean bookBound) {
+        this.bookBound = bookBound;
     }
 }

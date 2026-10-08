@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,19 +61,23 @@ class ChapterAccessServiceTest {
     }
 
     @Test
-    void lockedChapterDeniedWhenOverdue() {
+    void lockedChapterReadableWhenPurchasedEvenIfBorrowDoesNotUnlock() {
         EbookBook book = new EbookBook();
         book.setBookId(99L);
         EbookChapter ch = new EbookChapter();
         ch.setIsPreviewFree(0);
         when(borrowOrderRepository.hasUnlockBorrow(1L, 99L)).thenReturn(false);
-        when(tradeOrderRepository.hasPaidBook(1L, 99L)).thenReturn(false);
-        assertThat(service.canReadChapter(1L, book, ch)).isFalse();
+        when(tradeOrderRepository.hasPaidBook(1L, 99L)).thenReturn(true);
+        assertThat(service.canReadChapter(1L, book, ch)).isTrue();
     }
 
     @Test
-    void adminRoleUnlockedViaMediaAccess() {
-        MediaAccessService mediaAccessService = new MediaAccessService(borrowOrderRepository, tradeOrderRepository);
-        assertThat(mediaAccessService.canWatchFullMedia(1L, 99L, List.of("ADMIN"))).isTrue();
+    void adminCanReadLockedChapterWithoutBorrowOrPurchase() {
+        EbookBook book = new EbookBook();
+        book.setBookId(99L);
+        EbookChapter ch = new EbookChapter();
+        ch.setIsPreviewFree(0);
+        assertThat(service.canReadChapter(1L, book, ch, List.of("USER", "ADMIN"))).isTrue();
+        verifyNoInteractions(borrowOrderRepository, tradeOrderRepository);
     }
 }

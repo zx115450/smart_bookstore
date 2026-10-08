@@ -38,7 +38,7 @@ public class ReaderEbookController {
             @RequestAttribute(AuthAttributes.AUTH_USER) AuthPrincipal principal,
             @PathVariable Long ebookId
     ) {
-        return ApiResponse.ok(ebookReaderService.listChapters(principal.userId(), ebookId));
+        return ApiResponse.ok(ebookReaderService.listChapters(principal.userId(), ebookId, principal.roles()));
     }
 
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
@@ -48,7 +48,8 @@ public class ReaderEbookController {
             @PathVariable Long ebookId,
             @PathVariable Integer chapterNo
     ) {
-        return ApiResponse.ok(ebookReaderService.getChapterContent(principal.userId(), ebookId, chapterNo));
+        return ApiResponse.ok(ebookReaderService.getChapterContent(
+                principal.userId(), ebookId, chapterNo, principal.roles()));
     }
 
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
@@ -67,6 +68,7 @@ public class ReaderEbookController {
             @PathVariable Long ebookId,
             @RequestBody UpdateProgressRequest request
     ) {
-        return ApiResponse.ok(readingProgressService.updateProgress(principal.userId(), ebookId, request));
+        return ApiResponse.ok(readingProgressService.updateProgress(
+                principal.userId(), ebookId, request, principal.roles()));
     }
 }

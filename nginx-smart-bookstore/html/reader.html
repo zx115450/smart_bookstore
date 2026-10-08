@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>在线阅读 · 智慧书城</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root { --brand:#0f5c4c; --paper:#f3f6f4; --ink:#1a2332; --line:#dce5e1; --accent:#c45c26; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family:"Noto Sans SC",sans-serif; background:var(--paper); color:var(--ink); }
+      header { display:flex; align-items:center; gap:16px; padding:16px 24px; background:#14352f; color:#fff; }
+      header a { color:#e8b86d; text-decoration:none; }
+      header h1 { margin:0; font-family:"Noto Serif SC",serif; font-size:20px; font-weight:600; }
+      main { display:grid; grid-template-columns:280px 1fr; gap:20px; max-width:1100px; margin:0 auto; padding:24px; }
+      .panel { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; }
+      label { display:block; font-size:13px; margin-bottom:8px; }
+      .row { display:flex; gap:8px; }
+      input { flex:1; border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; }
+      button { border:0; background:var(--brand); color:#fff; border-radius:8px; padding:8px 14px; cursor:pointer; font:inherit; }
+      .warn { margin:12px 0 0; padding:10px 12px; background:#fdf0e9; color:#8d3e16; border-radius:8px; font-size:13px; }
+      ul { list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:8px; }
+      li button { width:100%; text-align:left; background:#fff; color:var(--ink); border:1px solid var(--line); }
+      li button.locked { color:#8a95a5; }
+      li button.active { border-color:var(--brand); background:#e6f2ef; }
+      article { min-height:420px; }
+      article h2 { font-family:"Noto Serif SC",serif; margin:0 0 12px; }
+      pre { white-space:pre-wrap; line-height:1.8; font-family:inherit; margin:0; }
+      .msg { color:#8a95a5; }
+      @media (max-width:800px) { main { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="/books">返回书城</a>
+      <h1>在线阅读</h1>
+    </header>
+    <main>
+      <section class="panel">
+        <label for="ebookId">电子书编号</label>
+        <div class="row">
+          <input id="ebookId" inputmode="numeric" placeholder="例如 1" />
+          <button id="load" type="button">打开目录</button>
+        </div>
+        <p id="bound" class="warn" hidden>这本书还没关联实体书，付费章无法按借阅或购买解锁。</p>
+        <ul id="toc"></ul>
+      </section>
+      <article class="panel" id="content">
+        <p class="msg">登录后输入电子书编号，选择章节阅读。</p>
+      </article>
+    </main>
+    <script>
+      const token = sessionStorage.getItem("accessToken");
+      const params = new URLSearchParams(location.search);
+      const input = document.getElementById("ebookId");
+      if (params.get("ebookId")) input.value = params.get("ebookId");
+
+      async function api(path) {
+        const res = await fetch(path, { headers: token ? { Authorization: "Bearer " + token } : {} });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || body.code && body.code !== 0) {
+          throw new Error(body.message || "请求失败");
+        }
+        return body.data;
+      }
+
+      function showMessage(text) {
+        document.getElementById("content").innerHTML = '<p class="msg"></p>';
+        document.querySelector("#content .msg").textContent = text;
+      }
+
+      async function openChapter(ebookId, item, button) {
+        document.querySelectorAll("#toc button").forEach((el) => el.classList.remove("active"));
+        button.classList.add("active");
+        showMessage("正在读取…");
+        try {
+          const data = await api("/api/reader/ebooks/" + ebookId + "/chapters/" + item.chapterNo);
+          const article = document.getElementById("content");
+          article.innerHTML = "<h2></h2><pre></pre>";
+          article.querySelector("h2").textContent = data.title || ("第" + item.chapterNo + "章");
+          article.querySelector("pre").textContent = data.content || "";
+        } catch (err) {
+          showMessage(err.message || "无法阅读本章");
+        }
+      }
+
+      async function loadToc() {
+        const ebookId = input.value.trim();
+        const toc = document.getElementById("toc");
+        const bound = document.getElementById("bound");
+        toc.innerHTML = "";
+        bound.hidden = true;
+        if (!token) {
+          showMessage("请先在书城登录，再打开在线阅读。");
+          return;
+        }
+        if (!ebookId) {
+          showMessage("请填写电子书编号。");
+          return;
+        }
+        try {
+          const chapters = await api("/api/reader/ebooks/" + ebookId + "/chapters");
+          if (!chapters.length) {
+            showMessage("这本书还没有目录。");
+            return;
+          }
+          bound.hidden = chapters.some((ch) => ch.bookBound !== false);
+          chapters.forEach((item) => {
+            const li = document.createElement("li");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = (item.locked ? "锁定 · " : "") + (item.title || ("第" + item.chapterNo + "章"));
+            if (item.locked) button.classList.add("locked");
+            button.addEventListener("click", () => openChapter(ebookId, item, button));
+            li.appendChild(button);
+            toc.appendChild(li);
+          });
+          showMessage(chapters.some((ch) => ch.bookBound === false)
+            ? "未绑定实体书时，只有试看章可以打开。"
+            : "选择左侧章节开始阅读。");
+        } catch (err) {
+          showMessage(err.message || "目录加载失败");
+        }
+      }
+
+      document.getElementById("load").addEventListener("click", loadToc);
+      if (input.value) loadToc();
+    </script>
+  </body>
+</html>

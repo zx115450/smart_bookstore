@@ -23,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -31,6 +34,8 @@ import java.util.stream.Collectors;
 public class BorrowService {
 
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    /** 每张借阅单最多续借一次，逾期后续借可恢复线上阅读。 */
+    private static final int MAX_RENEW = 1;
 
     private final BorrowOrderRepository borrowOrderRepository;
     private final BookRepository bookRepository;
@@ -44,6 +49,9 @@ public class BorrowService {
         if (req == null || req.getBookId() == null) {
             throw new IllegalArgumentException("bookId 不能为空");
         }
+        if (borrowOrderRepository.hasPendingApplyByUser(principal.userId())) {
+            throw BorrowException.pendingApply();
+        }
         if (borrowOrderRepository.hasActiveBorrowByUser(principal.userId())) {
             throw BorrowException.hasUnreturned();
         }
@@ -55,8 +63,8 @@ public class BorrowService {
         }
 
         int stock = book.getBorrowStock() == null ? 0 : book.getBorrowStock();
-        long occupied = borrowOrderRepository.countOccupiedByBookId(req.getBookId());
-        if (stock <= occupied) {
+        long pendingApplies = borrowOrderRepository.countAppliedByBookId(req.getBookId());
+        if (stock <= pendingApplies) {
             throw BorrowException.outOfStock();
         }
 
@@ -84,6 +92,47 @@ public class BorrowService {
             return reloadOrThrow(orderId, BorrowOrderStatus.CANCELLED);
         }
         order.setStatus(BorrowOrderStatus.CANCELLED.name());
+        return buildResponse(order);
+    }
+
+    /**
+     * 借阅中或逾期可续借一次。应还日未到时从原应还日顺延，已逾期则从现在起算，并恢复为借阅中。
+     */
+    @Transactional
+    public BorrowOrderResponse renew(AuthPrincipal principal, Long orderId) {
+        BorrowOrder order = loadOwnedOrder(principal, orderId);
+        String status = order.getStatus();
+        if (!BorrowOrderStatus.BORROWED.name().equals(status)
+                && !BorrowOrderStatus.OVERDUE.name().equals(status)) {
+            throw BorrowException.invalidStatus();
+        }
+        int used = order.getRenewCount() == null ? 0 : order.getRenewCount();
+        if (used >= MAX_RENEW) {
+            throw BorrowException.renewLimit();
+        }
+
+        Book book = bookRepository.findByIdForUpdate(order.getBookId())
+                .orElseThrow(BookstoreException::bookNotFound);
+        int borrowDays = book.getBorrowDays() == null ? 30 : book.getBorrowDays();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime base = order.getDueAt() != null && order.getDueAt().isAfter(now) ? order.getDueAt() : now;
+        LocalDateTime dueAt = base.plusDays(borrowDays);
+
+        int rows = borrowOrderRepository.updateRenew(orderId, dueAt, MAX_RENEW);
+        if (rows == 0) {
+            BorrowOrder latest = borrowOrderRepository.findById(orderId)
+                    .orElseThrow(BorrowException::orderNotFound);
+            int latestUsed = latest.getRenewCount() == null ? 0 : latest.getRenewCount();
+            if (latestUsed >= MAX_RENEW) {
+                throw BorrowException.renewLimit();
+            }
+            throw BorrowException.invalidStatus();
+        }
+
+        order.setStatus(BorrowOrderStatus.BORROWED.name());
+        order.setDueAt(dueAt);
+        order.setRenewCount(used + 1);
+        borrowDueRedisService.scheduleDue(orderId, dueAt);
         return buildResponse(order);
     }
 
@@ -165,11 +214,8 @@ public class BorrowService {
     public PageResult<BorrowOrderResponse> listMyOrders(AuthPrincipal principal, String status, long page, long size) {
         long safePage = Math.max(1, page);
         long safeSize = Math.min(Math.max(1, size), 100);
-        List<BorrowOrderResponse> records = borrowOrderRepository
-                .pageByUser(principal.userId(), status, safePage, safeSize)
-                .stream()
-                .map(this::buildResponse)
-                .collect(Collectors.toList());
+        List<BorrowOrderResponse> records = toResponses(borrowOrderRepository
+                .pageByUser(principal.userId(), status, safePage, safeSize));
         return new PageResult<>(safePage, safeSize,
                 borrowOrderRepository.countByUser(principal.userId(), status), records);
     }
@@ -177,11 +223,8 @@ public class BorrowService {
     public PageResult<BorrowOrderResponse> listAllOrders(String status, long page, long size) {
         long safePage = Math.max(1, page);
         long safeSize = Math.min(Math.max(1, size), 100);
-        List<BorrowOrderResponse> records = borrowOrderRepository
-                .pageAll(status, safePage, safeSize)
-                .stream()
-                .map(this::buildResponse)
-                .collect(Collectors.toList());
+        List<BorrowOrderResponse> records = toResponses(borrowOrderRepository
+                .pageAll(status, safePage, safeSize));
         return new PageResult<>(safePage, safeSize, borrowOrderRepository.countAll(status), records);
     }
 
@@ -231,25 +274,64 @@ public class BorrowService {
         throw BorrowException.invalidStatus();
     }
 
+    private List<BorrowOrderResponse> toResponses(List<BorrowOrder> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> userIds = orders.stream().map(BorrowOrder::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> bookIds = orders.stream().map(BorrowOrder::getBookId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, com.zx.auth.entity.AuthUser> users = authUserRepository.findByIds(userIds);
+        Map<Long, Book> books = bookRepository.findByIds(bookIds);
+        Set<Long> shelfIds = books.values().stream()
+                .map(Book::getBookshelfId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, com.zx.bookstore.catalog.entity.Bookshelf> shelves = bookshelfRepository.findByIds(shelfIds);
+        return orders.stream().map(order -> buildResponse(order, users, books, shelves)).toList();
+    }
+
     private BorrowOrderResponse buildResponse(BorrowOrder order) {
+        Map<Long, com.zx.auth.entity.AuthUser> users = order.getUserId() == null
+                ? Map.of()
+                : authUserRepository.findByIds(Set.of(order.getUserId()));
+        Map<Long, Book> books = order.getBookId() == null
+                ? Map.of()
+                : bookRepository.findByIds(Set.of(order.getBookId()));
+        Set<Long> shelfIds = books.values().stream()
+                .map(Book::getBookshelfId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return buildResponse(order, users, books, bookshelfRepository.findByIds(shelfIds));
+    }
+
+    private BorrowOrderResponse buildResponse(BorrowOrder order,
+                                             Map<Long, com.zx.auth.entity.AuthUser> users,
+                                             Map<Long, Book> books,
+                                             Map<Long, com.zx.bookstore.catalog.entity.Bookshelf> shelves) {
         BorrowOrderResponse resp = new BorrowOrderResponse();
         resp.setId(order.getId());
         resp.setOrderNo(order.getOrderNo());
         resp.setUserId(order.getUserId());
-        authUserRepository.findById(order.getUserId())
-                .ifPresent(user -> resp.setUsername(user.getUsername()));
-        resp.setBookId(order.getBookId());
-        bookRepository.findById(order.getBookId()).ifPresent(book -> {
-            resp.setBookTitle(book.getTitle());
-            if (book.getBookshelfId() != null) {
-                bookshelfRepository.findById(book.getBookshelfId()).ifPresent(bookshelf -> {
-                    resp.setBookshelfFloor(bookshelf.getFloor());
-                    resp.setBookshelfCode(bookshelf.getCode());
-                    resp.setShelfLayer(book.getShelfLayer());
-                    resp.setShelfLocation(ShelfLocationSupport.format(bookshelf, book.getShelfLayer()));
-                });
+        if (order.getUserId() != null) {
+            com.zx.auth.entity.AuthUser user = users.get(order.getUserId());
+            if (user != null) {
+                resp.setUsername(user.getUsername());
             }
-        });
+        }
+        resp.setBookId(order.getBookId());
+        Book book = order.getBookId() == null ? null : books.get(order.getBookId());
+        if (book != null) {
+            resp.setBookTitle(book.getTitle());
+            com.zx.bookstore.catalog.entity.Bookshelf bookshelf = book.getBookshelfId() == null
+                    ? null
+                    : shelves.get(book.getBookshelfId());
+            if (bookshelf != null) {
+                resp.setBookshelfFloor(bookshelf.getFloor());
+                resp.setBookshelfCode(bookshelf.getCode());
+                resp.setShelfLayer(book.getShelfLayer());
+                resp.setShelfLocation(ShelfLocationSupport.format(bookshelf, book.getShelfLayer()));
+            }
+        }
         resp.setStatus(order.getStatus());
         resp.setBorrowAt(formatDateTime(order.getBorrowAt()));
         resp.setDueAt(formatDateTime(order.getDueAt()));

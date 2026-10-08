@@ -1,6 +1,5 @@
 package com.zx.reader.service;
 
-import com.zx.media.client.LiteMediaClient;
 import com.zx.reader.ReaderException;
 import com.zx.reader.dto.ChapterContentResponse;
 import com.zx.reader.dto.ChapterTocItemResponse;
@@ -12,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -27,21 +27,32 @@ public class EbookReaderService {
     private final EbookBookRepository ebookBookRepository;
     private final EbookChapterRepository ebookChapterRepository;
     private final ChapterAccessService chapterAccessService;
-    private final LiteMediaClient liteMediaClient;
+    private final ChapterTextCache chapterTextCache;
 
     public List<ChapterTocItemResponse> listChapters(Long userId, Long ebookId) {
+        return listChapters(userId, ebookId, null);
+    }
+
+    public List<ChapterTocItemResponse> listChapters(Long userId, Long ebookId, Collection<String> roles) {
         EbookBook book = requireOnlineEbook(ebookId);
+        boolean unlocked = chapterAccessService.hasUnlockedAccess(userId, book, roles);
+        boolean bookBound = book.getBookId() != null;
         return ebookChapterRepository.listByEbookId(book.getId()).stream()
-                .map(ch -> toTocItem(userId, book, ch))
+                .map(ch -> toTocItem(ch, unlocked, bookBound))
                 .toList();
     }
 
     public ChapterContentResponse getChapterContent(Long userId, Long ebookId, Integer chapterNo) {
+        return getChapterContent(userId, ebookId, chapterNo, null);
+    }
+
+    public ChapterContentResponse getChapterContent(Long userId, Long ebookId, Integer chapterNo,
+                                                    Collection<String> roles) {
         EbookBook book = requireOnlineEbook(ebookId);
         EbookChapter chapter = ebookChapterRepository.findByEbookIdAndChapterNo(book.getId(), chapterNo)
                 .orElseThrow(ReaderException::ebookNotFound);
 
-        if (!chapterAccessService.canReadChapter(userId, book, chapter)) {
+        if (!chapterAccessService.canReadChapter(userId, book, chapter, roles)) {
             // 5103：绝不调用 fetchObjectText
             throw ReaderException.previewDenied();
         }
@@ -50,7 +61,7 @@ public class EbookReaderService {
             throw ReaderException.chapterNotReady("章节尚未绑定媒资对象");
         }
 
-        String text = liteMediaClient.fetchObjectText(chapter.getChapterFileId());
+        String text = chapterTextCache.get(chapter.getChapterFileId());
 
         ChapterContentResponse resp = new ChapterContentResponse();
         resp.setChapterNo(chapter.getChapterNo());
@@ -59,12 +70,14 @@ public class EbookReaderService {
         return resp;
     }
 
-    private ChapterTocItemResponse toTocItem(Long userId, EbookBook book, EbookChapter chapter) {
+    private ChapterTocItemResponse toTocItem(EbookChapter chapter, boolean unlocked, boolean bookBound) {
         ChapterTocItemResponse item = new ChapterTocItemResponse();
         item.setChapterNo(chapter.getChapterNo());
         item.setTitle(chapter.getTitle());
         item.setWordCount(chapter.getWordCount() == null ? 0 : chapter.getWordCount());
-        item.setLocked(!chapterAccessService.canReadChapter(userId, book, chapter));
+        boolean preview = chapter.getIsPreviewFree() != null && chapter.getIsPreviewFree() == 1;
+        item.setLocked(!preview && !unlocked);
+        item.setBookBound(bookBound);
         return item;
     }
 

@@ -44,13 +44,6 @@ class MediaAccessServiceTest {
     }
 
     @Test
-    void lockedWhenOverdueEvenIfStillHoldingBook() {
-        when(borrowOrderRepository.hasUnlockBorrow(1L, 10L)).thenReturn(false);
-        when(tradeOrderRepository.hasPaidBook(1L, 10L)).thenReturn(false);
-        assertThat(service.canWatchFullMedia(1L, 10L)).isFalse();
-    }
-
-    @Test
     void lockedWhenReturnedAndNotPaid() {
         when(borrowOrderRepository.hasUnlockBorrow(1L, 10L)).thenReturn(false);
         when(tradeOrderRepository.hasPaidBook(1L, 10L)).thenReturn(false);

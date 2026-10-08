@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -61,7 +62,7 @@ class StudyAgentToolsTest {
 
     @Test
     void getChapterContent_denied_shouldNotFabricate() {
-        when(ebookReaderService.getChapterContent(1L, 10L, 3))
+        when(ebookReaderService.getChapterContent(1L, 10L, 3, List.of()))
                 .thenThrow(ReaderException.previewDenied());
 
         Map<String, Object> result = tools.getChapterContent(10L, 3);
@@ -76,10 +77,10 @@ class StudyAgentToolsTest {
         chapter.setChapterNo(2);
         chapter.setTitle("主从");
         chapter.setContent("正文");
-        when(ebookReaderService.getChapterContent(1L, 10L, 2)).thenReturn(chapter);
+        when(ebookReaderService.getChapterContent(1L, 10L, 2, List.of())).thenReturn(chapter);
         when(summaryCacheService.get(10L, 2)).thenReturn(Optional.of("缓存总结"));
         when(ebookChapterRepository.findByEbookIdAndChapterNo(10L, 2)).thenReturn(Optional.empty());
-        when(noteService.saveAiNote(eq(1L), eq(10L), any(), eq("AI_SUMMARY"), anyString(), eq("缓存总结")))
+        when(noteService.saveAiNote(eq(1L), eq(10L), any(), eq("AI_SUMMARY"), anyString(), eq("缓存总结"), eq(List.of())))
                 .thenAnswer(inv -> {
                     NoteResponse n = new NoteResponse();
                     n.setId(99L);
@@ -106,7 +107,7 @@ class StudyAgentToolsTest {
         original.setContent("很长的原文");
         when(noteService.get(1L, 5L)).thenReturn(original);
         when(textGenerator.generate(anyString(), anyString())).thenReturn("短文");
-        when(noteService.saveAiNote(eq(1L), eq(10L), eq(101L), eq("AI_REWRITE"), anyString(), eq("短文")))
+        when(noteService.saveAiNote(eq(1L), eq(10L), eq(101L), eq("AI_REWRITE"), anyString(), eq("短文"), eq(List.of())))
                 .thenAnswer(inv -> {
                     NoteResponse n = new NoteResponse();
                     n.setId(6L);

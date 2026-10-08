@@ -12,6 +12,7 @@ import com.zx.reader.service.EbookReaderService;
 import com.zx.reader.service.NoteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -28,7 +29,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@ConditionalOnBean(StudyTextGenerator.class)
+@ConditionalOnBean(ChatModel.class)
 @RequiredArgsConstructor
 public class StudyAgentTools {
 
@@ -54,7 +55,8 @@ public class StudyAgentTools {
             return err("ebookId 与 chapterNo 必填");
         }
         try {
-            ChapterContentResponse content = ebookReaderService.getChapterContent(userId, eid, chapterNo);
+            ChapterContentResponse content = ebookReaderService.getChapterContent(
+                    userId, eid, chapterNo, StudyAgentContext.roles());
             Map<String, Object> ok = new LinkedHashMap<>();
             ok.put("ok", true);
             ok.put("ebookId", eid);
@@ -113,7 +115,7 @@ public class StudyAgentTools {
             req.setTitle(title);
             req.setQuoteText(quoteText);
             req.setSourceType(sourceType);
-            NoteResponse saved = noteService.create(userId, req);
+            NoteResponse saved = noteService.create(userId, req, StudyAgentContext.roles());
             Map<String, Object> ok = new LinkedHashMap<>();
             ok.put("ok", true);
             ok.put("note", slimNote(saved));
@@ -138,7 +140,8 @@ public class StudyAgentTools {
             return err("ebookId 与 chapterNo 必填");
         }
         try {
-            ChapterContentResponse chapter = ebookReaderService.getChapterContent(userId, eid, chapterNo);
+            ChapterContentResponse chapter = ebookReaderService.getChapterContent(
+                    userId, eid, chapterNo, StudyAgentContext.roles());
             String summary = summaryCacheService.get(eid, chapterNo).orElse(null);
             boolean cacheHit = summary != null;
             if (!cacheHit) {
@@ -150,7 +153,7 @@ public class StudyAgentTools {
             Long chapterId = resolveChapterId(eid, chapterNo);
             NoteResponse note = noteService.saveAiNote(
                     userId, eid, chapterId, "AI_SUMMARY",
-                    "第" + chapterNo + "章总结", summary);
+                    "第" + chapterNo + "章总结", summary, StudyAgentContext.roles());
             Map<String, Object> ok = new LinkedHashMap<>();
             ok.put("ok", true);
             ok.put("cacheHit", cacheHit);
@@ -192,7 +195,7 @@ public class StudyAgentTools {
                     userId, original.getEbookId(), original.getChapterId(),
                     "AI_REWRITE",
                     "改写：" + nullToEmpty(original.getTitle()),
-                    rewritten);
+                    rewritten, StudyAgentContext.roles());
             Map<String, Object> ok = new LinkedHashMap<>();
             ok.put("ok", true);
             ok.put("originalNoteId", noteId);
@@ -247,7 +250,7 @@ public class StudyAgentTools {
             UserNote first = notes.getFirst();
             NoteResponse saved = noteService.saveAiNote(
                     userId, first.getEbookId(), first.getChapterId(),
-                    "AI_MERGE", "合并笔记", merged);
+                    "AI_MERGE", "合并笔记", merged, StudyAgentContext.roles());
             Map<String, Object> ok = new LinkedHashMap<>();
             ok.put("ok", true);
             ok.put("mergedFrom", notes.stream().map(UserNote::getId).toList());

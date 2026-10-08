@@ -75,7 +75,7 @@ class BorrowServiceTest {
 
         when(borrowOrderRepository.hasActiveBorrowByUser(user.userId())).thenReturn(false);
         when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(book));
-        when(borrowOrderRepository.countOccupiedByBookId(10L)).thenReturn(2L); // 5 - 2 > 0
+        when(borrowOrderRepository.countAppliedByBookId(10L)).thenReturn(2L); // 5 - 2 > 0
         when(borrowOrderRepository.save(any(BorrowOrder.class))).thenAnswer(invocation -> {
             BorrowOrder o = invocation.getArgument(0);
             o.setId(1L);
@@ -88,7 +88,7 @@ class BorrowServiceTest {
         // then
         assertEquals(BorrowOrderStatus.APPLIED.name(), resp.getStatus());
         verify(borrowOrderRepository, times(1)).save(any(BorrowOrder.class));
-        verify(borrowOrderRepository).countOccupiedByBookId(10L);
+        verify(borrowOrderRepository).countAppliedByBookId(10L);
     }
 
     /**
@@ -103,6 +103,17 @@ class BorrowServiceTest {
         when(borrowOrderRepository.hasActiveBorrowByUser(user.userId())).thenReturn(true);
 
         assertThrows(BorrowException.class, () -> borrowService.apply(user, req));
+        verify(bookRepository, never()).findByIdForUpdate(anyLong());
+    }
+
+    @Test
+    void apply_shouldRejectWhenUserHasPendingApply() {
+        CreateBorrowOrderRequest req = new CreateBorrowOrderRequest();
+        req.setBookId(10L);
+        when(borrowOrderRepository.hasPendingApplyByUser(user.userId())).thenReturn(true);
+
+        assertThrows(BorrowException.class, () -> borrowService.apply(user, req));
+        verify(borrowOrderRepository, never()).hasActiveBorrowByUser(any());
         verify(bookRepository, never()).findByIdForUpdate(anyLong());
     }
 
@@ -122,7 +133,7 @@ class BorrowServiceTest {
 
         when(borrowOrderRepository.hasActiveBorrowByUser(user.userId())).thenReturn(false);
         when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(book));
-        when(borrowOrderRepository.countOccupiedByBookId(10L)).thenReturn(2L); // 2 <= 2
+        when(borrowOrderRepository.countAppliedByBookId(10L)).thenReturn(2L); // 2 <= 2
 
         assertThrows(BorrowException.class, () -> borrowService.apply(user, req));
         verify(borrowOrderRepository, never()).save(any(BorrowOrder.class));
@@ -200,5 +211,61 @@ class BorrowServiceTest {
 
         assertEquals(BorrowOrderStatus.CANCELLED.name(), resp.getStatus());
         verify(borrowOrderRepository).updateToCancelled(1L);
+    }
+
+    @Test
+    void apply_shouldUseRemainingStockAfterConfirmedBorrow() {
+        CreateBorrowOrderRequest req = new CreateBorrowOrderRequest();
+        req.setBookId(10L);
+        Book book = new Book();
+        book.setId(10L);
+        book.setStatus(1);
+        book.setBorrowStock(1);
+        when(borrowOrderRepository.hasActiveBorrowByUser(user.userId())).thenReturn(false);
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(book));
+        when(borrowOrderRepository.countAppliedByBookId(10L)).thenReturn(0L);
+        when(borrowOrderRepository.save(any(BorrowOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BorrowOrderResponse resp = borrowService.apply(user, req);
+
+        assertEquals(BorrowOrderStatus.APPLIED.name(), resp.getStatus());
+        verify(borrowOrderRepository, never()).countOccupiedByBookId(any());
+    }
+
+    @Test
+    void renew_overdue_shouldRestoreBorrowedAndExtendDue() {
+        BorrowOrder order = new BorrowOrder();
+        order.setId(3L);
+        order.setUserId(user.userId());
+        order.setBookId(10L);
+        order.setStatus(BorrowOrderStatus.OVERDUE.name());
+        order.setRenewCount(0);
+        order.setDueAt(java.time.LocalDateTime.now().minusDays(1));
+        Book book = new Book();
+        book.setId(10L);
+        book.setBorrowDays(14);
+        when(borrowOrderRepository.findById(3L)).thenReturn(Optional.of(order));
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(book));
+        when(borrowOrderRepository.updateRenew(eq(3L), any(), eq(1))).thenReturn(1);
+
+        BorrowOrderResponse resp = borrowService.renew(user, 3L);
+
+        assertEquals(BorrowOrderStatus.BORROWED.name(), resp.getStatus());
+        verify(borrowDueRedisService).scheduleDue(eq(3L), any());
+        verify(bookRepository, never()).saveBorrowStock(any());
+    }
+
+    @Test
+    void renew_shouldRejectWhenAlreadyRenewed() {
+        BorrowOrder order = new BorrowOrder();
+        order.setId(3L);
+        order.setUserId(user.userId());
+        order.setBookId(10L);
+        order.setStatus(BorrowOrderStatus.BORROWED.name());
+        order.setRenewCount(1);
+        when(borrowOrderRepository.findById(3L)).thenReturn(Optional.of(order));
+
+        assertThrows(BorrowException.class, () -> borrowService.renew(user, 3L));
+        verify(borrowOrderRepository, never()).updateRenew(any(), any(), anyInt());
     }
 }
