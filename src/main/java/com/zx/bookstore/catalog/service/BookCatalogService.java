@@ -10,6 +10,7 @@ import com.zx.bookstore.catalog.repository.BookshelfRepository;
 import com.zx.bookstore.catalog.metrics.BookCacheMetrics;
 import com.zx.bookstore.catalog.support.ShelfLocationSupport;
 import com.zx.bookstore.exception.BookstoreException;
+import com.zx.reader.repository.EbookBookRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,14 +39,23 @@ public class BookCatalogService {
     private final BookHotKeyService bookHotKeyService;
     /** 缓存读路径业务指标：经 Actuator 暴露给 Prometheus。 */
     private final BookCacheMetrics bookCacheMetrics;
+    /** 实体书 → 线上书绑定（详情「在线阅读」入口）。 */
+    private final EbookBookRepository ebookBookRepository;
 
     public PageResult<BookResponse> listBooks(Long categoryId, String keyword, long page, long size) {
         List<Book> books = bookRepository.pageEnabled(categoryId, keyword, page, size);
         long total = bookRepository.countEnabled(categoryId, keyword);
         Map<Long, String> categoryNameById = categoryNameById(books);
         Map<Long, Bookshelf> bookshelfById = bookshelfById(books);
+        Map<Long, Long> ebookIdByBookId = ebookBookRepository.findEnabledEbookIdByBookIds(
+                books.stream().map(Book::getId).collect(Collectors.toList()));
         List<BookResponse> records = books.stream()
-                .map(b -> toResponse(b, categoryNameById.get(b.getCategoryId()), bookshelfById.get(b.getBookshelfId())))
+                .map(b -> {
+                    BookResponse resp = toResponse(
+                            b, categoryNameById.get(b.getCategoryId()), bookshelfById.get(b.getBookshelfId()));
+                    resp.setEbookId(ebookIdByBookId.get(b.getId()));
+                    return resp;
+                })
                 .collect(Collectors.toList());
         return new PageResult<>(Math.max(1, page), Math.min(Math.max(1, size), 100), total, records);
     }
@@ -63,7 +73,7 @@ public class BookCatalogService {
             log.debug("book detail L1 cache hit, id={}", id);
             bookCacheMetrics.onL1Hit();
             bookHotKeyService.recordAccess(id);
-            return local.get();
+            return withEbookId(local.get());
         }
         Optional<BookResponse> redis = bookCacheFacade.getRedis(id);
         if (redis.isPresent()) {
@@ -71,7 +81,7 @@ public class BookCatalogService {
             bookCacheFacade.fillLocal(redis.get());
             bookCacheMetrics.onL2Hit();
             bookHotKeyService.recordAccess(id);
-            return redis.get();
+            return withEbookId(redis.get());
         }
 
         Optional<Book> bookOpt = bookRepository.findEnabledById(id);
@@ -83,6 +93,16 @@ public class BookCatalogService {
         BookResponse response = loadAndCacheBook(bookOpt.get(), id);
         bookCacheMetrics.onMiss();
         bookHotKeyService.recordAccess(id);
+        return withEbookId(response);
+    }
+
+    /** ebookId 不进缓存主体，读时现查，避免旧缓存缺字段。 */
+    private BookResponse withEbookId(BookResponse response) {
+        if (response == null || response.getId() == null) {
+            return response;
+        }
+        ebookBookRepository.findEnabledByBookId(response.getId())
+                .ifPresent(ebook -> response.setEbookId(ebook.getId()));
         return response;
     }
 

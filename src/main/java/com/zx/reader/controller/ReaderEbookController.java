@@ -3,10 +3,13 @@ package com.zx.reader.controller;
 import com.zx.auth.security.AuthAttributes;
 import com.zx.auth.security.AuthPrincipal;
 import com.zx.common.dto.ApiResponse;
+import com.zx.reader.ReaderException;
 import com.zx.reader.dto.ChapterContentResponse;
 import com.zx.reader.dto.ChapterTocItemResponse;
+import com.zx.reader.dto.EbookByBookResponse;
 import com.zx.reader.dto.ReadingProgressResponse;
 import com.zx.reader.dto.UpdateProgressRequest;
+import com.zx.reader.repository.EbookBookRepository;
 import com.zx.reader.service.EbookReaderService;
 import com.zx.reader.service.ReadingProgressService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,18 @@ public class ReaderEbookController {
 
     private final EbookReaderService ebookReaderService;
     private final ReadingProgressService readingProgressService;
+    private final EbookBookRepository ebookBookRepository;
+
+    /**
+     * 按实体书查绑定的上架线上书（须写在 /{ebookId}/** 之前，避免 by-book 被当成 ebookId）。
+     */
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @GetMapping("/by-book/{bookId}")
+    public ApiResponse<EbookByBookResponse> findByBook(@PathVariable Long bookId) {
+        return ebookBookRepository.findEnabledByBookId(bookId)
+                .map(e -> ApiResponse.ok(new EbookByBookResponse(e.getId(), e.getBookId(), e.getTitle())))
+                .orElseThrow(ReaderException::ebookNotFound);
+    }
 
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @GetMapping("/{ebookId}/chapters")

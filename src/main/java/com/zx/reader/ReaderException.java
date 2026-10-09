@@ -20,8 +20,9 @@ public class ReaderException extends BusinessException {
         return new ReaderException(ErrorCode.READER_PREVIEW_DENIED, "本章需借阅或购买后阅读");
     }
 
+    /** 需绑定实体书才能走的业务（如借阅解锁）；TOC 同步本身不强制 book_id。 */
     public static ReaderException ebookNotBound() {
-        return new ReaderException(ErrorCode.READER_EBOOK_NOT_BOUND, "电子书未关联实体书，无法同步目录");
+        return new ReaderException(ErrorCode.READER_EBOOK_NOT_BOUND, "电子书未关联实体书");
     }
 
     public static ReaderException noteForbidden() {

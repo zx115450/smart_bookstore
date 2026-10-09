@@ -1,8 +1,12 @@
 package com.zx.media.client;
 
+import com.zx.media.client.dto.AbortMultipartRequest;
 import com.zx.media.client.dto.ChaptersResult;
 import com.zx.media.client.dto.CommitMediaRequest;
+import com.zx.media.client.dto.CompleteMultipartRequest;
 import com.zx.media.client.dto.MediaInfo;
+import com.zx.media.client.dto.MultipartUploadRequest;
+import com.zx.media.client.dto.MultipartUploadSignature;
 import com.zx.media.client.dto.ObjectUrlResponse;
 import com.zx.media.client.dto.PlaySignature;
 import com.zx.media.client.dto.UploadSignature;
@@ -19,8 +23,8 @@ import java.nio.charset.StandardCharsets;
 /**
  * 真实媒资 HTTP 客户端。
  * <p>
- * upload / commit / object-url → {@code /internal/medias/**} + {@code X-Internal-Token}；
- * listChapters / getMedia / play → {@code /vod/**}。
+ * upload / commit / object-url / play-url → {@code /internal/medias/**} + {@code X-Internal-Token}；
+ * listChapters / getMedia → {@code /vod/**}。
  */
 public class LiteMediaClientImpl implements LiteMediaClient {
 
@@ -38,6 +42,69 @@ public class LiteMediaClientImpl implements LiteMediaClient {
     public UploadSignature createUploadSignature(String assetType) {
         String type = assetType == null || assetType.isBlank() ? "DOCUMENT" : assetType;
         return getInternal("/internal/medias/upload-signature", UploadSignature.class, type);
+    }
+
+    @Override
+    public MultipartUploadSignature createMultipartUploadSignature(MultipartUploadRequest request) {
+        try {
+            return restClient.post()
+                    .uri("/internal/medias/upload-signature/multipart")
+                    .header(INTERNAL_TOKEN_HEADER, token())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .onStatus(status -> status.value() == 501, (req, res) -> {
+                        throw ReaderException.mediaUnavailable("媒资未启用 multipart 上传（501）");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw mapHttpError(res.getStatusCode().value(), "申请分片上传凭证失败");
+                    })
+                    .body(MultipartUploadSignature.class);
+        } catch (ReaderException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw mapTransportError(ex);
+        }
+    }
+
+    @Override
+    public void completeMultipart(String fileId, CompleteMultipartRequest request) {
+        try {
+            restClient.post()
+                    .uri("/internal/medias/uploads/{fileId}/complete", fileId)
+                    .header(INTERNAL_TOKEN_HEADER, token())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw mapHttpError(res.getStatusCode().value(), "完成分片合并失败");
+                    })
+                    .toBodilessEntity();
+        } catch (ReaderException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw mapTransportError(ex);
+        }
+    }
+
+    @Override
+    public void abortMultipart(String fileId, AbortMultipartRequest request) {
+        try {
+            restClient.post()
+                    .uri("/internal/medias/uploads/{fileId}/abort", fileId)
+                    .header(INTERNAL_TOKEN_HEADER, token())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw mapHttpError(res.getStatusCode().value(), "中止分片上传失败");
+                    })
+                    .toBodilessEntity();
+        } catch (ReaderException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw mapTransportError(ex);
+        }
     }
 
     @Override
@@ -130,10 +197,10 @@ public class LiteMediaClientImpl implements LiteMediaClient {
         try {
             return restClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/vod/signature/play")
-                            .queryParam("fileId", fileId)
+                            .path("/internal/medias/{id}/play-url")
                             .queryParam("preview", preview)
-                            .build())
+                            .build(fileId))
+                    .header(INTERNAL_TOKEN_HEADER, token())
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
                         throw mapHttpError(res.getStatusCode().value(), "播放签名失败");

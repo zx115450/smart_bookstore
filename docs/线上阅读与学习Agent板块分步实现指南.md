@@ -31,7 +31,7 @@
 
 ## 一、本板块做什么
 
-在书城落地：**线上书目录、试看、笔记、学习 Agent（总结 / 改写 / 合并）**，以及图书配套视频的绑定与播放（调用已有 `/vod/signature/play`）。
+在书城落地：**线上书目录、试看、笔记、学习 Agent（总结 / 改写 / 合并）**，以及图书配套视频的绑定与播放（production：`/internal/medias/{id}/play-url`）。
 
 正文**不进书城库**。`ebook_chapter` 只存目录 + `chapter_file_id`；读章经 BFF 向媒资拉文本。
 
@@ -64,7 +64,7 @@
 B0～B1  不依赖媒资进程（Client 接口 + Flyway）
 B2～B3  Mock listChapters / fetchObjectText 即可演示试看
 B4～B5  笔记与 Agent 只依赖 Mock 章文本
-B6      真实 GET /vod/signature/play（视频首期已存在，可先接）
+B6      真实 GET /internal/medias/{id}/play-url（公开 /vod/signature/play 仅 debug）
 B2 切章同步  换成真实 HTTP 当媒资 L3 完成
 ```
 
@@ -87,7 +87,7 @@ GET  /internal/medias/{fileId}/object-url?ttl=   # 返回短链，BFF 再 GET Mi
 # 元数据（可走公开 /vod，或后续也收口 internal；首期 Client 用 /vod 即可）
 GET  /vod/medias/{fileId}
 GET  /vod/medias/{fileId}/chapters
-GET  /vod/signature/play?fileId=&preview=        # 视频播放；用户鉴权在书城后再调
+GET  /internal/medias/{fileId}/play-url?preview= # 视频播放；用户鉴权在书城后再调 + Token
 
 # 媒资本地 debug（书城生产勿依赖）
 GET  /vod/signature/upload?assetType=
@@ -103,7 +103,7 @@ GET  /vod/signature/object?fileId=&ttl=
 | `commit(...)` | `POST /internal/medias` + Token |
 | `listChapters` / `getMedia` | `GET /vod/medias/...` |
 | `fetchObjectText(fileId)` | `GET /internal/.../object-url` + Token → **再 GET MinIO** |
-| `getPlaySignature` | `GET /vod/signature/play`（书城先鉴权） |
+| `getPlaySignature` | `GET /internal/medias/{id}/play-url` + Token（书城先鉴权） |
 
 超时：connect 3s、read 10s。媒资挂了：阅读正文 6002；借阅等原模块不受影响（`enabled=false` 可启动）。
 
@@ -353,7 +353,7 @@ reader:
 ## 九、检查表
 
 ```text
-B0 □ Client + Mock 开关  □ Client 生产路径走 internal（upload/commit/object-url）+ Token
+B0 □ Client + Mock 开关  □ Client 生产路径走 internal（upload/commit/object-url/play-url）+ Token
 B1 □ Flyway 无 content_text
 B2 □ 同步 TOC  □ ADMIN 鉴权后经 Client 要凭证，前端只 PUT MinIO
 B3 □ 5103 不打媒资  □ BFF 读章

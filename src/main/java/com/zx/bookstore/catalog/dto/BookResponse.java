@@ -21,6 +21,8 @@ public class BookResponse {
     private String bookshelfCode;
     private Integer shelfLayer;
     private String shelfLocation;
+    /** 绑定的上架线上书 ID；无电子书时为 null。 */
+    private Long ebookId;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -58,4 +60,6 @@ public class BookResponse {
     public void setShelfLayer(Integer shelfLayer) { this.shelfLayer = shelfLayer; }
     public String getShelfLocation() { return shelfLocation; }
     public void setShelfLocation(String shelfLocation) { this.shelfLocation = shelfLocation; }
+    public Long getEbookId() { return ebookId; }
+    public void setEbookId(Long ebookId) { this.ebookId = ebookId; }
 }

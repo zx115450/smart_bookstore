@@ -61,7 +61,7 @@ BOOKSTORE_MEDIA_TOKEN  ===  VOD_INTERNAL_TOKEN
 | `listChapters(sourceFileId)` | `GET /vod/medias/{id}/chapters` | 固定 3 章 mock-c-1..3 |
 | `getMedia(fileId)` | `GET /vod/medias/{id}` | FINISHED DOCUMENT |
 | `fetchObjectText(fileId)` | object-url + **再 GET MinIO** | 返回测试资源内写死正文 |
-| `getPlaySignature(fileId, preview)` | `GET /vod/signature/play` | 返回假 playUrl（B6 再用） |
+| `getPlaySignature(fileId, preview)` | `GET /internal/medias/{id}/play-url?preview=` + Token | 返回假 playUrl（B6 再用） |
 
 请求头：`X-Internal-Token: {internal-token}`（仅 internal 路径）。  
 超时：connect 3s、read 10s。媒资 5xx / 超时 → 映射书城 `6002`。
@@ -92,7 +92,7 @@ BOOKSTORE_MEDIA_TOKEN  ===  VOD_INTERNAL_TOKEN
 ## 完成标准
 
 - [ ] `LiteMediaClient` 接口 + Impl + Mock 可切换
-- [ ] 生产路径默认打 `/internal/medias/**`（upload / commit / object-url）并带 Token
+- [ ] 生产路径默认打 `/internal/medias/**`（upload / commit / object-url / play-url）并带 Token
 - [ ] 配置项可从 `application.yaml` / env 读取
 - [ ] `ReaderException` 预留 5101 / 5103 / 6002 / 6003
 - [ ] 客服 `/api/ai/chat` 仍可调用（本步未改 AI）

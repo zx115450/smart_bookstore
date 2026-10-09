@@ -47,7 +47,11 @@ public class SecurityConfig {
                                 "/actuator/metrics",
                                 "/actuator/metrics/**"
                         ).permitAll()
-                        .requestMatchers("/api/admin/**", "/api/reservation/admin/**", "/api/ai/admin/**")
+                        .requestMatchers(
+                                "/api/admin/**",
+                                "/api/reservation/admin/**",
+                                "/api/ai/admin/**",
+                                "/api/reader/admin/**")
                         .hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

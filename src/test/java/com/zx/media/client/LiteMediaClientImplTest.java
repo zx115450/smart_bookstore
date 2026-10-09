@@ -1,7 +1,15 @@
 package com.zx.media.client;
 
+import com.zx.media.client.dto.AbortMultipartRequest;
 import com.zx.media.client.dto.CommitMediaRequest;
+import com.zx.media.client.dto.CompleteMultipartRequest;
+import com.zx.media.client.dto.MultipartUploadRequest;
+import com.zx.media.client.dto.MultipartUploadSignature;
+import com.zx.media.client.dto.PartEtag;
+import com.zx.media.client.dto.PlaySignature;
 import com.zx.media.client.dto.UploadSignature;
+
+import java.util.List;
 import com.zx.reader.ReaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,6 +80,50 @@ class LiteMediaClientImplTest {
     }
 
     @Test
+    void createMultipartUploadSignature_shouldPostInternalWithToken() {
+        server.expect(requestTo("http://vod.test/internal/medias/upload-signature/multipart"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(LiteMediaClientImpl.INTERNAL_TOKEN_HEADER, "secret-token"))
+                .andRespond(withSuccess("""
+                        {"fileId":"doc-m","objectKey":"raw/doc-m/source.bin","uploadId":"uid-1",
+                         "partSize":10485760,"partCount":2,
+                         "parts":[{"partNumber":1,"uploadUrl":"http://minio/p1"},
+                                  {"partNumber":2,"uploadUrl":"http://minio/p2"}],
+                         "expireAt":1710000000}
+                        """, MediaType.APPLICATION_JSON));
+
+        MultipartUploadSignature sig = client.createMultipartUploadSignature(
+                MultipartUploadRequest.document("a.md", "text/markdown", 20_000_000L, 10_485_760L));
+        assertEquals("doc-m", sig.fileId());
+        assertEquals("uid-1", sig.uploadId());
+        assertEquals(2, sig.partCount());
+        server.verify();
+    }
+
+    @Test
+    void completeMultipart_shouldPostInternalWithToken() {
+        server.expect(requestTo("http://vod.test/internal/medias/uploads/doc-m/complete"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(LiteMediaClientImpl.INTERNAL_TOKEN_HEADER, "secret-token"))
+                .andRespond(withSuccess());
+
+        client.completeMultipart("doc-m",
+                new CompleteMultipartRequest("uid-1", List.of(new PartEtag(1, "\"a\""))));
+        server.verify();
+    }
+
+    @Test
+    void abortMultipart_shouldPostInternalWithToken() {
+        server.expect(requestTo("http://vod.test/internal/medias/uploads/doc-m/abort"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(LiteMediaClientImpl.INTERNAL_TOKEN_HEADER, "secret-token"))
+                .andRespond(withSuccess());
+
+        client.abortMultipart("doc-m", new AbortMultipartRequest("uid-1"));
+        server.verify();
+    }
+
+    @Test
     void commit_shouldPostInternalWithToken() {
         server.expect(requestTo("http://vod.test/internal/medias"))
                 .andExpect(method(HttpMethod.POST))
@@ -113,6 +165,22 @@ class LiteMediaClientImplTest {
         var result = client.listChapters("doc-1");
         assertEquals(1, result.chapters().size());
         assertEquals("c1", result.chapters().getFirst().fileId());
+        server.verify();
+    }
+
+    @Test
+    void getPlaySignature_shouldCallInternalPlayUrlWithToken() {
+        server.expect(requestTo("http://vod.test/internal/medias/vid-1/play-url?preview=true"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(LiteMediaClientImpl.INTERNAL_TOKEN_HEADER, "secret-token"))
+                .andRespond(withSuccess("""
+                        {"fileId":"vid-1","playUrl":"http://cdn/hls/vid-1/index.m3u8?e=1&exper=300&sign=abc","signature":"abc","expireAt":1710000000}
+                        """, MediaType.APPLICATION_JSON));
+
+        PlaySignature play = client.getPlaySignature("vid-1", true);
+        assertEquals("vid-1", play.fileId());
+        assertTrue(play.playUrl().contains("exper=300"));
+        assertEquals("abc", play.signature());
         server.verify();
     }
 }

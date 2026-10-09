@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -60,9 +61,7 @@ public class EbookTocSyncService {
     }
 
     private int syncEbook(EbookBook book) {
-        if (book.getBookId() == null) {
-            throw ReaderException.ebookNotBound();
-        }
+        // book_id 可选：未绑定实体书也可同步 TOC（B2 管理端导入）
         ChaptersResult result = liteMediaClient.listChapters(book.getSourceFileId());
         List<ChapterInfo> chapters = result == null || result.chapters() == null
                 ? List.of()
@@ -83,6 +82,7 @@ public class EbookTocSyncService {
         }
 
         long totalWords = 0;
+        List<EbookChapter> rows = new ArrayList<>(chapters.size());
         for (ChapterInfo info : chapters) {
             EbookChapter row = new EbookChapter();
             row.setEbookId(book.getId());
@@ -93,9 +93,10 @@ public class EbookTocSyncService {
             row.setChapterFileId(info.fileId());
             row.setWordCount(Math.max(0, info.wordCount()));
             row.setIsPreviewFree(info.chapterNo() <= previewN ? 1 : 0);
-            ebookChapterRepository.save(row);
+            rows.add(row);
             totalWords += row.getWordCount();
         }
+        ebookChapterRepository.insertAll(rows);
 
         book.setTotalChapters(chapters.size());
         book.setWordCount(totalWords);

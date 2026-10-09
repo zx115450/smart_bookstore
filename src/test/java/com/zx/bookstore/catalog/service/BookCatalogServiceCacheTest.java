@@ -6,6 +6,7 @@ import com.zx.bookstore.catalog.metrics.BookCacheMetrics;
 import com.zx.bookstore.catalog.repository.BookCategoryRepository;
 import com.zx.bookstore.catalog.repository.BookRepository;
 import com.zx.bookstore.catalog.repository.BookshelfRepository;
+import com.zx.reader.repository.EbookBookRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,6 +41,8 @@ class BookCatalogServiceCacheTest {
     private BookHotKeyService bookHotKeyService;
     @Mock
     private BookCacheMetrics bookCacheMetrics;
+    @Mock
+    private EbookBookRepository ebookBookRepository;
 
     @InjectMocks
     private BookCatalogService catalogService;

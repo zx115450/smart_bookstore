@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,18 +60,20 @@ class EbookTocSyncServiceTest {
                 new ChapterInfo(2, "二", "c2", 200, "CHAPTER"),
                 new ChapterInfo(3, "三", "c3", 300, "CHAPTER")
         )));
-        when(ebookChapterRepository.save(any(EbookChapter.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(ebookChapterRepository.insertAll(any())).thenAnswer(inv -> ((List<?>) inv.getArgument(0)).size());
         when(ebookBookRepository.save(any(EbookBook.class))).thenAnswer(inv -> inv.getArgument(0));
 
         int n = service.syncBySourceFileId("doc-1");
         assertThat(n).isEqualTo(3);
 
         verify(ebookChapterRepository).deleteByEbookId(10L);
-        ArgumentCaptor<EbookChapter> captor = ArgumentCaptor.forClass(EbookChapter.class);
-        verify(ebookChapterRepository, times(3)).save(captor.capture());
-        assertThat(captor.getAllValues().get(0).getIsPreviewFree()).isEqualTo(1);
-        assertThat(captor.getAllValues().get(1).getIsPreviewFree()).isEqualTo(1);
-        assertThat(captor.getAllValues().get(2).getIsPreviewFree()).isEqualTo(0);
+        verify(ebookChapterRepository, never()).save(any());
+        ArgumentCaptor<List<EbookChapter>> captor = ArgumentCaptor.forClass(List.class);
+        verify(ebookChapterRepository).insertAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(3);
+        assertThat(captor.getValue().get(0).getIsPreviewFree()).isEqualTo(1);
+        assertThat(captor.getValue().get(1).getIsPreviewFree()).isEqualTo(1);
+        assertThat(captor.getValue().get(2).getIsPreviewFree()).isEqualTo(0);
         assertThat(book.getTotalChapters()).isEqualTo(3);
         assertThat(book.getWordCount()).isEqualTo(600L);
     }
@@ -100,15 +101,20 @@ class EbookTocSyncServiceTest {
     }
 
     @Test
-    void syncBySourceFileId_shouldRefuseWhenBookNotBound() {
+    void syncBySourceFileId_shouldAllowWhenBookIdNull() {
         EbookBook book = new EbookBook();
         book.setId(4L);
         book.setSourceFileId("doc-unbound");
+        book.setPreviewChapters(2);
         when(ebookBookRepository.findBySourceFileId("doc-unbound")).thenReturn(Optional.of(book));
+        when(liteMediaClient.listChapters("doc-unbound")).thenReturn(new ChaptersResult("doc-unbound", List.of(
+                new ChapterInfo(1, "一", "c1", 10, "CHAPTER")
+        )));
+        when(ebookChapterRepository.insertAll(any())).thenReturn(1);
+        when(ebookBookRepository.save(any(EbookBook.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> service.syncBySourceFileId("doc-unbound"))
-                .isInstanceOf(ReaderException.class);
-        verify(liteMediaClient, never()).listChapters(any());
-        verify(ebookChapterRepository, never()).deleteByEbookId(any());
+        assertThat(service.syncBySourceFileId("doc-unbound")).isEqualTo(1);
+        verify(ebookChapterRepository).deleteByEbookId(4L);
+        verify(ebookChapterRepository).insertAll(any());
     }
 }
